@@ -1,0 +1,143 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        String     @id @default(uuid())
+  name      String
+  slug      String     @unique
+  logo      String?
+  theme     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  users     User[]
+  assets    Asset[]
+  jobSites  JobSite[]
+  vehicles  Vehicle[]
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  name      String?
+  avatar    String?
+  role      String     @default("Worker")
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id])
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+model Asset {
+  id          String         @id @default(uuid())
+  name        String
+  category    String
+  serial      String?
+  purchaseDate DateTime?
+  photos      String[]
+  documents   String[]
+  condition   String?
+  status      String         @default("Available")
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id])
+  assignments Assignment[]
+  inspections Inspection[]
+  tags        AssetTag[]
+  locationEvents LocationEvent[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  auditLogs   AuditLog[]
+}
+
+model AssetTag {
+  id         String   @id @default(uuid())
+  type       String
+  identifier String
+  assetId    String
+  asset      Asset    @relation(fields: [assetId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Assignment {
+  id         String   @id @default(uuid())
+  assetId    String
+  asset      Asset    @relation(fields: [assetId], references: [id])
+  assignedTo String
+  site       String?
+  vehicle    String?
+  outAt      DateTime @default(now())
+  dueAt      DateTime?
+  inAt       DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Inspection {
+  id        String   @id @default(uuid())
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id])
+  checklist String
+  result    String
+  signedBy  String?
+  nextDue   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LocationEvent {
+  id        String   @id @default(uuid())
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id])
+  method    String
+  latitude  Float?
+  longitude Float?
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model JobSite {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Vehicle {
+  id        String   @id @default(uuid())
+  name      String
+  plate     String?
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  assetId   String?
+  asset     Asset?   @relation(fields: [assetId], references: [id])
+  details   String?
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
