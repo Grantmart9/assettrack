@@ -42,7 +42,7 @@ export default function Navigation() {
             href="/scan"
             className="text-2xl font-semibold text-indigo-600 tracking-tight"
           >
-            <QrCodeScannerIcon className="block md:flex" />
+            <QrCodeScannerIcon className="block md:hidden w-6 h-6" />
           </Link>
           {/* Desktop Navigation */}
           <NavigationMenu className="hidden sm:flex">

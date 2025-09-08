@@ -350,14 +350,8 @@ export default function AdminUsersPage() {
 
   return (
     <div className="p-3">
-      <div className="grid grid-rows-2 md:flex justify-between mb-6">
-        <h1 className="text-2xl font-bold align-left">User Management</h1>
-        <button
-          onClick={handleAddUser}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-2 rounded-md align-right"
-        >
-          Add New User
-        </button>
+      <div className="flex justify-between mb-6">
+        <h1 className="text-2xl font-bold mt-4">User Management</h1>
       </div>
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -390,6 +384,14 @@ export default function AdminUsersPage() {
                 <TableHead>Pages</TableHead>
                 <TableHead>Created At</TableHead>
                 <TableHead>Actions</TableHead>
+                <TableHead>
+                  <button
+                    onClick={handleAddUser}
+                    className="bg-blue-600 hover:bg-blue-700 text-white hidden md:block text-nowrap p-2 mx-auto my-auto font-medium rounded-md"
+                  >
+                    Add New User
+                  </button>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -461,7 +463,12 @@ export default function AdminUsersPage() {
           </Table>
         )}
       </div>
-
+      <button
+        onClick={handleAddUser}
+        className="bg-blue-600 hover:bg-blue-700 text-white block md:hidden mt-4 text-nowrap p-2 mx-auto my-auto font-medium rounded-md"
+      >
+        Add New User
+      </button>
       {/* Add User Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="sm:max-w-md">
