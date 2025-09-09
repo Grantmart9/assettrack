@@ -181,6 +181,38 @@ export default function AssetsPage() {
     setUpdateError(null);
   };
 
+  // Handlers for asset delete
+  const handleDeleteAsset = async (asset: Asset) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete "${asset.name}"? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { error } = await assetService.delete(asset.id);
+
+      if (error) {
+        setAssetsError(
+          `Failed to delete asset: ${error.message || "Unknown error"}`
+        );
+        console.error("Error deleting asset:", error);
+        return;
+      }
+
+      // Refresh the assets list after successful deletion
+      await fetchAssets();
+
+      // Clear any existing errors since deletion was successful
+      setAssetsError(null);
+    } catch (err) {
+      setAssetsError("An unexpected error occurred while deleting the asset.");
+      console.error("Unexpected delete error:", err);
+    }
+  };
+
   const handleEditAsset = (asset: Asset) => {
     setSelectedAsset(asset);
     setDetailMode("edit");
@@ -1079,7 +1111,7 @@ export default function AssetsPage() {
                           whileHover={{ scale: 1.02 }}
                         >
                           <motion.button
-                            className="mr-2 px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                            className="mr-2 bg-blue-500 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded-md"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => handleEditAsset(asset)}
@@ -1088,13 +1120,22 @@ export default function AssetsPage() {
                             Edit
                           </motion.button>
                           <motion.button
-                            className="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                            className="mr-2 bg-yellow-500 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded-md"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => handleViewAsset(asset)}
                             aria-label={`View ${asset.name}`}
                           >
                             View
+                          </motion.button>
+                          <motion.button
+                            className=" bg-red-500 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded-md"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleDeleteAsset(asset)}
+                            aria-label={`Delete ${asset.name}`}
+                          >
+                            Delete
                           </motion.button>
                         </motion.td>
                       </motion.tr>
