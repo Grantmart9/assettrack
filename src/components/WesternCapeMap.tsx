@@ -43,7 +43,7 @@ type WesternCapeMapProps = {
  */
 export function WesternCapeMap({
   className = "",
-  zoom = 8,
+  zoom = 2,
   assets,
 }: WesternCapeMapProps) {
   const mapDiv = useRef<HTMLDivElement>(null);
@@ -61,6 +61,7 @@ export function WesternCapeMap({
     { id: "a4", lat: -34.8, lng: 20.0, label: "Mossel Bay Site" },
     { id: "a5", lat: -34.2, lng: 19.6, label: "Laptop" },
   ];
+
   const assetList = assets ?? demoAssets;
 
   /* --------------------------------------------------------------
@@ -86,7 +87,7 @@ export function WesternCapeMap({
       .then(() => {
         if (!mapDiv.current) return;
 
-        const centre = { lat: -33.9249, lng: 18.4241 }; // Cape Town approx.
+        const centre = { lat: -30.9249, lng: 40.4241 }; // Cape Town approx.
 
         const options: google.maps.MapOptions = {
           center: centre,
@@ -95,10 +96,10 @@ export function WesternCapeMap({
           // optional province‑level restriction
           restriction: {
             latLngBounds: {
-              north: -30.9,
+              north: -25.9,
               south: -35.5,
-              east: 22.0,
-              west: 15.5,
+              east: 21.0,
+              west: 20.5,
             },
             strictBounds: false,
           },

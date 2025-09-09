@@ -1,78 +1,155 @@
 "use client";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { WesternCapeMap } from "@/components/WesternCapeMap";
 
 // src/app/dashboard/page.tsx   (or any other component)
 import { BarChart } from "@/components/ChartJS";
 
-const barData1 = {
-  labels: [
-    "Jan",
-    "Feb",
-    "March",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ],
-  datasets: [
-    {
-      data: [120, 80, 45, 30, 80, 78, 43, 21, 32, 43, 56, 76],
-      backgroundColor: "#1014e8",
-    },
-  ],
-};
-const barData2 = {
-  labels: [
-    "Jan",
-    "Feb",
-    "March",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ],
-  datasets: [
-    {
-      data: [120, 80, 45, 30, 80, 78, 43, 21, 32, 43, 56, 76],
-      backgroundColor: "#e3180e",
-    },
-  ],
-};
-const barData3 = {
-  labels: [
-    "Jan",
-    "Feb",
-    "March",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ],
-  datasets: [
-    {
-      data: [120, 80, 45, 30, 80, 78, 43, 21, 32, 43, 56, 76],
-      backgroundColor: "#c48321",
-    },
-  ],
+// Type definitions
+interface ChartDataset {
+  data: number[];
+  backgroundColor: string;
+}
+
+interface ChartData {
+  title?: string;
+  number?: number;
+  labels: string[];
+  datasets: ChartDataset[];
+}
+
+interface BarChartWidgetProps {
+  data: ChartData;
+  index?: number;
+}
+
+const data: ChartData[] = [
+  {
+    title: "Total Assets",
+    number: 24212,
+    labels: [
+      "Jan",
+      "Feb",
+      "March",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ],
+    datasets: [
+      {
+        data: [
+          2000, 800, 1459, 1230, 1480, 1278, 4433, 4321, 4332, 4543, 4556, 4776,
+        ],
+        backgroundColor: "#1014e8",
+      },
+    ],
+  },
+  {
+    title: "Overdue checkins",
+    number: 22,
+    labels: [
+      "Jan",
+      "Feb",
+      "March",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ],
+    datasets: [
+      {
+        data: [120, 80, 45, 30, 80, 78, 43, 21, 32, 43, 56, 76],
+        backgroundColor: "#fcd703",
+      },
+    ],
+  },
+  {
+    title: "Overdue Inspections",
+    number: 8,
+    labels: [
+      "Jan",
+      "Feb",
+      "March",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ],
+    datasets: [
+      {
+        data: [120, 80, 45, 30, 80, 78, 43, 21, 32, 43, 56, 76],
+        backgroundColor: "#fc0307",
+      },
+    ],
+  },
+];
+
+const BarChartWidget = ({ data, index }: BarChartWidgetProps) => {
+  return (
+    <motion.div
+      key={index}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 1, delay: 0 }}
+      className="bg-white p-3 rounded-lg shadow"
+    >
+      <h2 className="text-xl font-semibold mb-4">{data.title || "Chart"}</h2>
+      <div className="grid grid-flow-col gap-1">
+        <div
+          className="text-3xl font-bold"
+          style={{ color: data.datasets[0].backgroundColor }}
+        >
+          {data.number || 0}
+        </div>
+        <section className="space-y-8">
+          {/* Bar chart – we override container size with Tailwind */}
+          <BarChart
+            className="w-full h-36"
+            data={data.datasets ? data : data}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: {
+                  display: false,
+                },
+                title: {
+                  display: false,
+                },
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  grid: { display: false },
+                },
+                x: {
+                  grid: { display: false },
+                },
+              },
+            }}
+          />
+        </section>
+      </div>
+    </motion.div>
+  );
 };
 
 export default function DashboardPage() {
@@ -83,118 +160,12 @@ export default function DashboardPage() {
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           </div>
-
           {/* Summary Widgets */}
           <div className="grid grid-flow-row md:grid-cols-2 gap-6 mb-8">
             <div className="grid grid-rows-3 md:grid-rows-3 gap-6">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 1, delay: 0 }}
-                className="bg-white p-3 rounded-lg shadow"
-              >
-                <h2 className="text-xl font-semibold mb-4">Total Assets</h2>
-                <div className="grid grid-flow-col gap-1">
-                  <div className="text-3xl font-bold text-indigo-600">24</div>
-                  <section className="space-y-8">
-                    {/* Bar chart – we override container size with Tailwind */}
-                    <BarChart
-                      className="w-full h-36"
-                      data={barData1}
-                      options={{
-                        responsive: true,
-                        plugins: {
-                          legend: {
-                            display: false,
-                          },
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            grid: { display: false },
-                          },
-                          x: {
-                            grid: { display: false },
-                          },
-                        },
-                      }}
-                    />
-                  </section>
-                </div>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, delay: 0.2 }}
-                className="bg-white p-3 rounded-lg shadow"
-              >
-                <h2 className="text-xl font-semibold mb-4">Checked Out</h2>
-                <div className="grid grid-flow-col gap-1">
-                  <div className="text-3xl font-bold text-red-600">8</div>
-                  <section className="space-y-8">
-                    {/* Bar chart – we override container size with Tailwind */}
-                    <BarChart
-                      className="w-full h-36"
-                      data={barData2}
-                      options={{
-                        responsive: true,
-                        plugins: {
-                          legend: {
-                            display: false,
-                          },
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            grid: { display: false },
-                          },
-                          x: {
-                            grid: { display: false },
-                          },
-                        },
-                      }}
-                    />
-                  </section>
-                </div>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, delay: 0.4 }}
-                className="bg-white p-3 rounded-lg shadow"
-              >
-                <h2 className="text-xl font-semibold mb-4">Overdue</h2>
-                <div className="grid grid-flow-col gap-1">
-                  <div className="text-3xl font-bold text-yellow-600">6</div>
-                  <section className="space-y-8">
-                    {/* Bar chart – we override container size with Tailwind */}
-                    <BarChart
-                      className="w-full h-36"
-                      data={barData3}
-                      options={{
-                        responsive: true,
-                        plugins: {
-                          legend: {
-                            display: false,
-                          },
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            grid: { display: false },
-                          },
-                          x: {
-                            grid: { display: false },
-                          },
-                        },
-                      }}
-                    />
-                  </section>
-                </div>
-              </motion.div>
+              {data.map((item, index) => (
+                <BarChartWidget key={index} data={item} index={index} />
+              ))}
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <WesternCapeMap className="rounded-md h-full" />
@@ -330,7 +301,6 @@ export default function DashboardPage() {
               </div>
             </motion.div>
           </div>
-
           {/* Recent Activity */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -348,7 +318,6 @@ export default function DashboardPage() {
                 </div>
                 <span className="text-sm text-gray-500">2 hours ago</span>
               </div>
-
               <div className="flex items-center justify-between p-4 border-b">
                 <div>
                   <p className="font-medium">
@@ -360,7 +329,6 @@ export default function DashboardPage() {
                 </div>
                 <span className="text-sm text-gray-500">5 hours ago</span>
               </div>
-
               <div className="flex items-center justify-between p-4">
                 <div>
                   <p className="font-medium">New asset added</p>
