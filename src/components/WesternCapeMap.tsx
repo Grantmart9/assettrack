@@ -50,19 +50,7 @@ export function WesternCapeMap({
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
 
-  /* --------------------------------------------------------------
-     Fake data – used only when the caller does not provide `assets`.
-     Replace / remove this constant in production.
-  -------------------------------------------------------------- */
-  const demoAssets: Asset[] = [
-    { id: "a1", lat: -33.9249, lng: 18.4241, label: "Cape Town Hub" },
-    { id: "a2", lat: -34.05, lng: 18.6, label: "Hydrualic Drill" },
-    { id: "a3", lat: -34.35, lng: 19.0, label: "Multimeter" },
-    { id: "a4", lat: -34.8, lng: 20.0, label: "Mossel Bay Site" },
-    { id: "a5", lat: -34.2, lng: 19.6, label: "Laptop" },
-  ];
-
-  const assetList = assets ?? demoAssets;
+  const assetList = assets ?? [];
 
   /* --------------------------------------------------------------
      Initialise the Google Map (once)

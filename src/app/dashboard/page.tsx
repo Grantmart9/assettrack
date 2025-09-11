@@ -3,11 +3,27 @@
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { motion } from "framer-motion";
 import { WesternCapeMap } from "@/components/WesternCapeMap";
-
-// src/app/dashboard/page.tsx   (or any other component)
 import { BarChart } from "@/components/ChartJS";
+import { assetService, Asset } from "@/lib/services/assetService";
+import { useState, useEffect } from "react";
 
-// Type definitions
+// Extended Asset type for dashboard that includes lat/lng when available
+interface DashboardAsset extends Asset {
+  lat?: number;
+  lng?: number;
+  qr?: string;
+  warrantiesDate?: string;
+}
+
+// Asset type for map component (simplified)
+interface MapAsset {
+  id: string;
+  lat: number;
+  lng: number;
+  label: string;
+}
+
+// Chart type definitions
 interface ChartDataset {
   data: number[];
   backgroundColor: string;
@@ -25,24 +41,26 @@ interface BarChartWidgetProps {
   index?: number;
 }
 
-const data: ChartData[] = [
+const chartLabels = [
+  "Jan",
+  "Feb",
+  "March",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const getChartData = (assets: DashboardAsset[]): ChartData[] => [
   {
     title: "Total Assets",
-    number: 24212,
-    labels: [
-      "Jan",
-      "Feb",
-      "March",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ],
+    number: assets.length,
+    labels: chartLabels,
     datasets: [
       {
         data: [
@@ -54,21 +72,8 @@ const data: ChartData[] = [
   },
   {
     title: "Overdue checkins",
-    number: 22,
-    labels: [
-      "Jan",
-      "Feb",
-      "March",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ],
+    number: assets.filter((a) => a.status === "checked_in").length,
+    labels: chartLabels,
     datasets: [
       {
         data: [120, 80, 45, 30, 80, 78, 43, 21, 32, 43, 56, 76],
@@ -78,21 +83,14 @@ const data: ChartData[] = [
   },
   {
     title: "Overdue Inspections",
-    number: 8,
-    labels: [
-      "Jan",
-      "Feb",
-      "March",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ],
+    number: assets.filter((a) => {
+      // Check if asset has an inspectionDate and if it's past the current date
+      if (!a.inspectionDate) return false;
+      const inspectionDate = new Date(a.inspectionDate);
+      const currentDate = new Date();
+      return inspectionDate < currentDate;
+    }).length,
+    labels: chartLabels,
     datasets: [
       {
         data: [120, 80, 45, 30, 80, 78, 43, 21, 32, 43, 56, 76],
@@ -153,22 +151,92 @@ const BarChartWidget = ({ data, index }: BarChartWidgetProps) => {
 };
 
 export default function DashboardPage() {
+  const [assets, setAssets] = useState<DashboardAsset[]>([]);
+  const [mapAssets, setMapAssets] = useState<MapAsset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Convert assets to map format
+  const convertToMapAssets = (assets: DashboardAsset[]): MapAsset[] => {
+    return assets
+      .filter((asset) => asset.lat && asset.lng) // Only include assets with coordinates
+      .map((asset) => ({
+        id: asset.id,
+        lat: asset.lat!,
+        lng: asset.lng!,
+        label: asset.name,
+      }));
+  };
+
+  // Fetch assets from Supabase
+  useEffect(() => {
+    const fetchAssets = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const { data: fetchedAssets, error: fetchError } =
+          await assetService.getAll();
+
+        if (fetchError) {
+          throw new Error(fetchError.message || "Failed to fetch assets");
+        }
+
+        // Cast to DashboardAsset to handle potential extra fields from database
+        const dashboardAssets = fetchedAssets as DashboardAsset[];
+        setAssets(dashboardAssets);
+        setMapAssets(convertToMapAssets(dashboardAssets));
+      } catch (err) {
+        console.error("Error fetching assets:", err);
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAssets();
+  }, []);
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <div className="text-sm text-gray-600">
+              {loading ? (
+                <span>Loading assets...</span>
+              ) : (
+                <span>{assets.length} assets loaded</span>
+              )}
+            </div>
           </div>
+
+          {/* Show error message if any */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
           {/* Summary Widgets */}
           <div className="grid grid-flow-row md:grid-cols-2 gap-6 mb-8">
             <div className="grid grid-rows-3 md:grid-rows-3 gap-6">
-              {data.map((item, index) => (
+              {getChartData(assets).map((item, index) => (
                 <BarChartWidget key={index} data={item} index={index} />
               ))}
             </div>
             <div className="bg-white rounded-lg shadow p-4">
-              <WesternCapeMap className="rounded-md h-full" />
+              {loading ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-gray-500">Loading map...</div>
+                </div>
+              ) : (
+                <WesternCapeMap
+                  className="rounded-md h-full"
+                  assets={mapAssets}
+                />
+              )}
             </div>
           </div>
           <div className="grid grid-flow-row gap-6">
