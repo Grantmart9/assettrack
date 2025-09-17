@@ -38,6 +38,7 @@ export default function AssetsPage() {
     status: "available",
     purchaseDate: "",
     inspectionDate: "",
+    warrantiesDate: "",
     photos: [],
     documents: [],
   });
@@ -269,6 +270,7 @@ export default function AssetsPage() {
       status: "available",
       purchaseDate: "",
       inspectionDate: "",
+      warrantiesDate: "",
       photos: [],
       documents: [],
     });
@@ -538,6 +540,19 @@ export default function AssetsPage() {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Warranties Date
+                    </label>
+                    <input
+                      type="date"
+                      name="warrantiesDate"
+                      value={formData.warrantiesDate || ""}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+
                   <div className="flex justify-end gap-3 mt-6">
                     <button
                       type="button"
@@ -761,6 +776,35 @@ export default function AssetsPage() {
                           className="block w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Warranties Date
+                        </label>
+                        <input
+                          type="date"
+                          value={
+                            editFormData.warrantiesDate
+                              ? new Date(editFormData.warrantiesDate)
+                                  .toISOString()
+                                  .split("T")[0]
+                              : selectedAsset.warrantiesDate
+                              ? new Date(selectedAsset.warrantiesDate)
+                                  .toISOString()
+                                  .split("T")[0]
+                              : ""
+                          }
+                          onChange={(e) =>
+                            setEditFormData({
+                              ...editFormData,
+                              warrantiesDate: e.target.value
+                                ? new Date(e.target.value).toISOString()
+                                : null,
+                            })
+                          }
+                          className="block w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                      </div>
                     </div>
 
                     <div className="flex justify-end gap-3 mt-6">
@@ -864,6 +908,18 @@ export default function AssetsPage() {
                               {selectedAsset.inspectionDate
                                 ? new Date(
                                     selectedAsset.inspectionDate
+                                  ).toLocaleDateString()
+                                : "Not specified"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-sm font-medium text-gray-900">
+                              Warranties Date
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              {selectedAsset.warrantiesDate
+                                ? new Date(
+                                    selectedAsset.warrantiesDate
                                   ).toLocaleDateString()
                                 : "Not specified"}
                             </span>

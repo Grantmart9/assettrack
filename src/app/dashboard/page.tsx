@@ -12,7 +12,6 @@ interface DashboardAsset extends Asset {
   lat?: number;
   lng?: number;
   qr?: string;
-  warrantiesDate?: string;
 }
 
 // Asset type for map component (simplified)
@@ -108,12 +107,12 @@ const BarChartWidget = ({ data, index }: BarChartWidgetProps) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 1, delay: 0 }}
-      className="bg-white p-3 rounded-lg shadow"
+      className="bg-white p-3 rounded-lg shadow-md"
     >
       <h2 className="text-xl font-semibold mb-4">{data.title || "Chart"}</h2>
       <div className="grid grid-flow-col gap-1">
         <div
-          className="text-3xl font-bold"
+          className="text-3xl font-bold align-center justify-center flex items-center lg:bg-blue-500/10 rounded-full lg:border-y-8 lg:border-x-2 border-gray-700 flex-shrink-0"
           style={{ color: data.datasets[0].backgroundColor }}
         >
           {data.number || 0}
@@ -155,6 +154,65 @@ export default function DashboardPage() {
   const [mapAssets, setMapAssets] = useState<MapAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper function to get recent inspections (assets with inspection dates, sorted by date)
+  const getRecentInspections = () => {
+    return assets
+      .filter((asset) => asset.inspectionDate)
+      .sort(
+        (a, b) =>
+          new Date(b.inspectionDate!).getTime() -
+          new Date(a.inspectionDate!).getTime()
+      )
+      .slice(0, 10); // Show last 10 inspections
+  };
+
+  // Helper function to get overdue warranties
+  const getOverdueWarranties = () => {
+    const currentDate = new Date();
+    return assets
+      .filter((asset) => {
+        if (!asset.warrantiesDate) return false;
+        const warrantyDate = new Date(asset.warrantiesDate);
+        return warrantyDate < currentDate;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.warrantiesDate!).getTime() -
+          new Date(b.warrantiesDate!).getTime()
+      );
+  };
+
+  // Helper function to get inspection status
+  const getInspectionStatus = (asset: DashboardAsset) => {
+    if (!asset.inspectionDate) return null;
+
+    const inspectionDate = new Date(asset.inspectionDate);
+    const currentDate = new Date();
+    const daysDiff = Math.ceil(
+      (inspectionDate.getTime() - currentDate.getTime()) / (1000 * 3600 * 24)
+    );
+
+    if (daysDiff < 0) {
+      return (
+        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+          Overdue
+        </span>
+      );
+    } else if (daysDiff <= 7) {
+      return (
+        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+          Due Soon
+        </span>
+      );
+    } else {
+      return (
+        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+          Current
+        </span>
+      );
+    }
+  };
 
   // Convert assets to map format
   const convertToMapAssets = (assets: DashboardAsset[]): MapAsset[] => {
@@ -221,12 +279,12 @@ export default function DashboardPage() {
 
           {/* Summary Widgets */}
           <div className="grid grid-flow-row md:grid-cols-2 gap-6 mb-8">
-            <div className="grid grid-rows-3 md:grid-rows-3 gap-6">
+            <div className="grid grid-rows-3 md:grid-rows-3 gap-6 bg-transparent">
               {getChartData(assets).map((item, index) => (
                 <BarChartWidget key={index} data={item} index={index} />
               ))}
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white rounded-lg shadow-md p-4">
               {loading ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-gray-500">Loading map...</div>
@@ -268,42 +326,50 @@ export default function DashboardPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            Laptop (ABC123)
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                              Passed
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            Printer (DEF456)
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            2023-05-15
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            Printer (DEF456)
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            2023-05-15
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            Vehicle (XYZ789)
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                              Due Soon
-                            </span>
-                          </td>
-                        </tr>
+                        {loading ? (
+                          <tr>
+                            <td colSpan={2} className="px-6 py-12 text-center">
+                              <div className="flex items-center justify-center">
+                                <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mr-3"></div>
+                                <span className="text-gray-500">
+                                  Loading inspections...
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : getRecentInspections().length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="px-6 py-12 text-center">
+                              <div className="text-gray-500">
+                                <div className="text-4xl mb-2">📋</div>
+                                <div className="text-lg font-medium mb-1">
+                                  No recent inspections
+                                </div>
+                                <div className="text-sm">
+                                  Assets with inspection dates will appear here.
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          getRecentInspections().map((asset) => (
+                            <tr key={asset.id}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {asset.name}{" "}
+                                {asset.serial ? `(${asset.serial})` : ""}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {getInspectionStatus(asset) || (
+                                  <span className="text-sm text-gray-500">
+                                    {new Date(
+                                      asset.inspectionDate!
+                                    ).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -330,38 +396,47 @@ export default function DashboardPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            Printer (DEF456)
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            2023-05-15
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            Printer (DEF456)
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            2023-05-15
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            Printer (DEF456)
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            2023-05-15
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            Server (GHI789)
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            2023-06-01
-                          </td>
-                        </tr>
+                        {loading ? (
+                          <tr>
+                            <td colSpan={2} className="px-6 py-12 text-center">
+                              <div className="flex items-center justify-center">
+                                <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mr-3"></div>
+                                <span className="text-gray-500">
+                                  Loading warranties...
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : getOverdueWarranties().length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="px-6 py-12 text-center">
+                              <div className="text-gray-500">
+                                <div className="text-4xl mb-2">✅</div>
+                                <div className="text-lg font-medium mb-1">
+                                  No overdue warranties
+                                </div>
+                                <div className="text-sm">
+                                  Assets with expired warranties will appear
+                                  here.
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          getOverdueWarranties().map((asset) => (
+                            <tr key={asset.id}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {asset.name}{" "}
+                                {asset.serial ? `(${asset.serial})` : ""}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(
+                                  asset.warrantiesDate!
+                                ).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>

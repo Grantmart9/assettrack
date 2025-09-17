@@ -81,6 +81,7 @@ export interface Database {
           serial: string | null;
           purchaseDate: string | null;
           inspectionDate: string | null;
+          warrantiesDate: string | null;
           photos: string[];
           documents: string[];
           condition: string | null;
@@ -96,6 +97,7 @@ export interface Database {
           serial?: string | null;
           purchaseDate?: string | null;
           inspectionDate?: string | null;
+          warrantiesDate?: string | null;
           photos?: string[];
           documents?: string[];
           condition?: string | null;
@@ -111,6 +113,7 @@ export interface Database {
           serial?: string | null;
           purchaseDate?: string | null;
           inspectionDate?: string | null;
+          warrantiesDate?: string | null;
           photos?: string[];
           documents?: string[];
           condition?: string | null;

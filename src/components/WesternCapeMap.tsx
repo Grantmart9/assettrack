@@ -75,7 +75,7 @@ export function WesternCapeMap({
       .then(() => {
         if (!mapDiv.current) return;
 
-        const centre = { lat: -30.9249, lng: 40.4241 }; // Cape Town approx.
+        const centre = { lat: -33.922121415702016, lng: 18.6861007556373 }; // Cape Town approx.
 
         const options: google.maps.MapOptions = {
           center: centre,
@@ -87,12 +87,12 @@ export function WesternCapeMap({
               north: -25.9,
               south: -35.5,
               east: 21.0,
-              west: 20.5,
+              west: 13.5,
             },
             strictBounds: false,
           },
           disableDefaultUI: false,
-          zoomControl: true,
+          zoomControl: false,
         };
 
         const map = new google.maps.Map(mapDiv.current, options);
