@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { WesternCapeMap } from "@/components/WesternCapeMap";
 import { BarChart } from "@/components/ChartJS";
 import { assetService, Asset } from "@/lib/services/assetService";
+import { auditLogService, AuditLog } from "@/lib/services/auditLogService";
 import { useState, useEffect } from "react";
 
 // Extended Asset type for dashboard that includes lat/lng when available
@@ -75,7 +76,7 @@ const getChartData = (assets: DashboardAsset[]): ChartData[] => [
     labels: chartLabels,
     datasets: [
       {
-        data: [120, 80, 45, 30, 80, 78, 43, 21, 32, 43, 56, 76],
+        data: [1, 8, 5, 3, 8, 7, 4, 2, 3, 4, 6, 7],
         backgroundColor: "#fcd703",
       },
     ],
@@ -92,7 +93,7 @@ const getChartData = (assets: DashboardAsset[]): ChartData[] => [
     labels: chartLabels,
     datasets: [
       {
-        data: [120, 80, 45, 30, 80, 78, 43, 21, 32, 43, 56, 76],
+        data: [2, 1, 2, 3, 1, 0, 0, 2, 2, 3, 1, 0],
         backgroundColor: "#fc0307",
       },
     ],
@@ -152,7 +153,9 @@ const BarChartWidget = ({ data, index }: BarChartWidgetProps) => {
 export default function DashboardPage() {
   const [assets, setAssets] = useState<DashboardAsset[]>([]);
   const [mapAssets, setMapAssets] = useState<MapAsset[]>([]);
+  const [recentLogs, setRecentLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [logsLoading, setLogsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Helper function to get recent inspections (assets with inspection dates, sorted by date)
@@ -226,6 +229,65 @@ export default function DashboardPage() {
       }));
   };
 
+  // Helper function to format audit log for display
+  const formatAuditLogForDisplay = (log: AuditLog) => {
+    const getActionDescription = (action: string, details: string | null) => {
+      switch (action) {
+        case "USER_LOGIN":
+          return "User logged in";
+        case "USER_LOGOUT":
+          return "User logged out";
+        case "ASSET_CREATED":
+          return "New asset added";
+        case "ASSET_UPDATED":
+          return "Asset updated";
+        case "ASSET_DELETED":
+          return "Asset deleted";
+        case "ASSET_CHECKED_OUT":
+          return "Asset checked out";
+        case "ASSET_CHECKED_IN":
+          return "Asset checked in";
+        case "QR_CODE_SCANNED":
+          return "QR code scanned";
+        case "INSPECTION_COMPLETED":
+          return "Inspection completed";
+        case "USER_REGISTERED":
+          return "New user registered";
+        case "TEST_LOG_CREATION":
+          return "System test performed";
+        default:
+          return action.replace(/_/g, " ").toLowerCase();
+      }
+    };
+
+    const getTimeAgo = (timestamp: string) => {
+      const now = new Date();
+      const logTime = new Date(timestamp);
+      const diffInMs = now.getTime() - logTime.getTime();
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      const diffInDays = Math.floor(diffInHours / 24);
+
+      if (diffInMinutes < 1) return "Just now";
+      if (diffInMinutes < 60)
+        return `${diffInMinutes} minute${diffInMinutes > 1 ? "s" : ""} ago`;
+      if (diffInHours < 24)
+        return `${diffInHours} hour${diffInHours > 1 ? "s" : ""} ago`;
+      if (diffInDays === 1) return "Yesterday";
+      if (diffInDays < 7) return `${diffInDays} days ago`;
+      return logTime.toLocaleDateString();
+    };
+
+    return {
+      id: log.id,
+      title: getActionDescription(log.action, log.details),
+      description: log.details || "",
+      timeAgo: getTimeAgo(log.timestamp),
+      userId: log.userId,
+      assetId: log.assetId,
+    };
+  };
+
   // Fetch assets from Supabase
   useEffect(() => {
     const fetchAssets = async () => {
@@ -253,6 +315,30 @@ export default function DashboardPage() {
     };
 
     fetchAssets();
+  }, []);
+
+  // Fetch recent audit logs via API
+  useEffect(() => {
+    const fetchRecentLogs = async () => {
+      try {
+        setLogsLoading(true);
+
+        const response = await fetch("/api/logs");
+        const result = await response.json();
+
+        if (!result.success) {
+          console.error("Error fetching recent logs:", result.error);
+        } else {
+          setRecentLogs(result.data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching recent logs:", err);
+      } finally {
+        setLogsLoading(false);
+      }
+    };
+
+    fetchRecentLogs();
   }, []);
 
   return (
@@ -454,33 +540,55 @@ export default function DashboardPage() {
           >
             <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 border-b">
-                <div>
-                  <p className="font-medium">Asset #12345 checked out</p>
-                  <p className="text-sm text-gray-500">by John Doe to Site A</p>
+              {logsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mr-3"></div>
+                  <span className="text-gray-500">
+                    Loading recent activity...
+                  </span>
                 </div>
-                <span className="text-sm text-gray-500">2 hours ago</span>
-              </div>
-              <div className="flex items-center justify-between p-4 border-b">
-                <div>
-                  <p className="font-medium">
-                    Inspection completed for Asset #67890
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Passed - signed by Jane Smith
-                  </p>
+              ) : recentLogs.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-4xl mb-2">📝</div>
+                  <div className="text-lg font-medium mb-1">
+                    No recent activity
+                  </div>
+                  <div className="text-sm">
+                    System activities will appear here as they occur.
+                  </div>
                 </div>
-                <span className="text-sm text-gray-500">5 hours ago</span>
-              </div>
-              <div className="flex items-center justify-between p-4">
-                <div>
-                  <p className="font-medium">New asset added</p>
-                  <p className="text-sm text-gray-500">
-                    Laptop - Serial: ABC123
-                  </p>
-                </div>
-                <span className="text-sm text-gray-500">1 day ago</span>
-              </div>
+              ) : (
+                recentLogs.map((log, index) => {
+                  const formatted = formatAuditLogForDisplay(log);
+                  return (
+                    <div
+                      key={log.id}
+                      className={`flex items-center justify-between p-4 ${
+                        index < recentLogs.length - 1 ? "border-b" : ""
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">
+                          {formatted.title}
+                        </p>
+                        {formatted.description && (
+                          <p className="text-sm text-gray-500 mt-1">
+                            {formatted.description}
+                          </p>
+                        )}
+                        {log.assetId && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            Asset ID: {log.assetId}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-sm text-gray-500 flex-shrink-0 ml-4">
+                        {formatted.timeAgo}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </motion.div>
         </div>

@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "../supabase/client";
 import { indexedDBService } from "./indexedDBService";
 import { Database } from "../supabase/database.types";
+import { auditLogService } from "./auditLogService";
 
 // Type for Asset
 export type Asset = Database["public"]["Tables"]["Asset"]["Row"];
@@ -168,24 +169,79 @@ export const assetService = {
     }
   },
 
-  // Check in asset
-  checkIn: async (assetId: string): Promise<{ data: any; error: any }> => {
+  // Check in asset (with audit logging)
+  checkIn: async (
+    assetId: string,
+    userId?: string,
+    assetName?: string
+  ): Promise<{ data: any; error: any }> => {
     const supabase = getSupabaseClient();
-    // Update the assignment record in Supabase
-    const { data, error } = await supabase
-      .from("Assignment")
-      .update({ inAt: new Date().toISOString() })
-      .eq("assetId", assetId)
-      .is("inAt", null) // Only update assignments that haven't been checked in yet
-      .select()
-      .single();
-    return { data, error };
+
+    try {
+      // Update the assignment record in Supabase
+      const { data, error } = await supabase
+        .from("Assignment")
+        .update({ inAt: new Date().toISOString() })
+        .eq("assetId", assetId)
+        .is("inAt", null) // Only update assignments that haven't been checked in yet
+        .select()
+        .single();
+
+      if (error) {
+        // Log failed check-in
+        if (userId) {
+          try {
+            await auditLogService.logError(
+              userId,
+              "ASSET_CHECKIN",
+              `Failed to check in asset: ${error.message}`,
+              assetId
+            );
+          } catch (auditError) {
+            console.error("Failed to log check-in error:", auditError);
+          }
+        }
+        return { data, error };
+      }
+
+      // Log successful check-in
+      if (userId) {
+        try {
+          await auditLogService.logAssetCheckedIn(
+            userId,
+            assetId,
+            assetName || `Asset ${assetId}`
+          );
+        } catch (auditError) {
+          console.error("Failed to log asset check-in:", auditError);
+        }
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      // Log unexpected error
+      if (userId) {
+        try {
+          await auditLogService.logError(
+            userId,
+            "ASSET_CHECKIN",
+            `Unexpected error checking in asset: ${error}`,
+            assetId
+          );
+        } catch (auditError) {
+          console.error("Failed to log check-in error:", auditError);
+        }
+      }
+      return { data: null, error };
+    }
   },
 
-  // Check out asset
+  // Check out asset (with audit logging)
   checkOut: async (
     assetId: string,
-    assignment: any
+    assignment: any,
+    userId?: string,
+    assetName?: string
   ): Promise<{ data: any; error: any }> => {
     try {
       const supabase = getSupabaseClient();
@@ -200,11 +256,51 @@ export const assetService = {
         .single();
 
       if (error) {
+        // Log failed check-out
+        if (userId) {
+          try {
+            await auditLogService.logError(
+              userId,
+              "ASSET_CHECKOUT",
+              `Failed to check out asset: ${error.message}`,
+              assetId
+            );
+          } catch (auditError) {
+            console.error("Failed to log check-out error:", auditError);
+          }
+        }
         return { data: null, error };
+      }
+
+      // Log successful check-out
+      if (userId) {
+        try {
+          await auditLogService.logAssetCheckedOut(
+            userId,
+            assetId,
+            assetName || `Asset ${assetId}`,
+            assignment.assignedTo
+          );
+        } catch (auditError) {
+          console.error("Failed to log asset check-out:", auditError);
+        }
       }
 
       return { data, error: null };
     } catch (error) {
+      // Log unexpected error
+      if (userId) {
+        try {
+          await auditLogService.logError(
+            userId,
+            "ASSET_CHECKOUT",
+            `Unexpected error checking out asset: ${error}`,
+            assetId
+          );
+        } catch (auditError) {
+          console.error("Failed to log check-out error:", auditError);
+        }
+      }
       return { data: null, error };
     }
   },

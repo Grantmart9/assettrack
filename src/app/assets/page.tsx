@@ -12,6 +12,7 @@ import {
 } from "@/lib/services/assetService";
 import { useAuth } from "@/lib/supabase/context";
 import cameraService from "@/lib/services/cameraService";
+import { auditLogService } from "@/lib/services/auditLogService";
 
 const scale_amount = 1.02;
 
@@ -200,7 +201,30 @@ export default function AssetsPage() {
           `Failed to delete asset: ${error.message || "Unknown error"}`
         );
         console.error("Error deleting asset:", error);
+
+        // Log the failed deletion attempt
+        if (user?.id) {
+          try {
+            await auditLogService.logError(
+              user.id,
+              "ASSET_DELETE",
+              `Failed to delete asset ${asset.name}: ${error.message}`,
+              asset.id
+            );
+          } catch (auditError) {
+            console.error("Failed to log deletion error:", auditError);
+          }
+        }
         return;
+      }
+
+      // Log successful deletion
+      if (user?.id) {
+        try {
+          await auditLogService.logAssetDeleted(user.id, asset.id, asset.name);
+        } catch (auditError) {
+          console.error("Failed to log asset deletion:", auditError);
+        }
       }
 
       // Refresh the assets list after successful deletion
@@ -211,6 +235,20 @@ export default function AssetsPage() {
     } catch (err) {
       setAssetsError("An unexpected error occurred while deleting the asset.");
       console.error("Unexpected delete error:", err);
+
+      // Log the unexpected error
+      if (user?.id) {
+        try {
+          await auditLogService.logError(
+            user.id,
+            "ASSET_DELETE",
+            `Unexpected error deleting asset ${asset.name}: ${err}`,
+            asset.id
+          );
+        } catch (auditError) {
+          console.error("Failed to log deletion error:", auditError);
+        }
+      }
     }
   };
 
@@ -241,14 +279,67 @@ export default function AssetsPage() {
       if (error) {
         setUpdateError("Failed to update asset. Please try again.");
         console.error("Asset update error:", error);
+
+        // Log the failed update attempt
+        if (user?.id) {
+          try {
+            await auditLogService.logError(
+              user.id,
+              "ASSET_UPDATE",
+              `Failed to update asset ${selectedAsset.name}: ${error.message}`,
+              selectedAsset.id
+            );
+          } catch (auditError) {
+            console.error("Failed to log update error:", auditError);
+          }
+        }
       } else {
         console.log("Asset updated successfully:", data);
+
+        // Log successful update
+        if (user?.id) {
+          try {
+            // Generate a summary of changes
+            const changes = Object.entries(updatedAsset)
+              .filter(
+                ([key, value]) =>
+                  value !== undefined &&
+                  value !== selectedAsset[key as keyof Asset]
+              )
+              .map(([key, value]) => `${key}: ${value}`)
+              .join(", ");
+
+            await auditLogService.logAssetUpdated(
+              user.id,
+              selectedAsset.id,
+              selectedAsset.name,
+              changes || "No changes detected"
+            );
+          } catch (auditError) {
+            console.error("Failed to log asset update:", auditError);
+          }
+        }
+
         handleCloseDetail();
         fetchAssets(); // Refresh the assets list
       }
     } catch (err) {
       setUpdateError("An unexpected error occurred while updating the asset.");
       console.error("Unexpected update error:", err);
+
+      // Log the unexpected error
+      if (user?.id) {
+        try {
+          await auditLogService.logError(
+            user.id,
+            "ASSET_UPDATE",
+            `Unexpected error updating asset ${selectedAsset.name}: ${err}`,
+            selectedAsset.id
+          );
+        } catch (auditError) {
+          console.error("Failed to log update error:", auditError);
+        }
+      }
     } finally {
       setIsUpdating(false);
     }
@@ -297,6 +388,19 @@ export default function AssetsPage() {
       if (cameraError) {
         setError("Failed to access camera. Please check permissions.");
         setIsScanning(false);
+
+        // Log camera error
+        if (user?.id) {
+          try {
+            await auditLogService.logError(
+              user.id,
+              "QR_SCAN",
+              `Camera access failed: ${cameraError}`
+            );
+          } catch (auditError) {
+            console.error("Failed to log QR scan error:", auditError);
+          }
+        }
         return;
       }
 
@@ -309,12 +413,51 @@ export default function AssetsPage() {
 
           if (scanError) {
             setError("Failed to scan QR code. Please try again.");
+
+            // Log scan error
+            if (user?.id) {
+              try {
+                await auditLogService.logError(
+                  user.id,
+                  "QR_SCAN",
+                  `QR scan failed: ${scanError}`
+                );
+              } catch (auditError) {
+                console.error("Failed to log QR scan error:", auditError);
+              }
+            }
           } else if (qrData) {
             setQrCode(qrData);
+
+            // Log successful QR scan
+            if (user?.id) {
+              try {
+                await auditLogService.logQRCodeScanned(
+                  user.id,
+                  undefined,
+                  qrData
+                );
+              } catch (auditError) {
+                console.error("Failed to log QR scan:", auditError);
+              }
+            }
           } else {
             // Simulate a successful scan for demo purposes
             const simulatedQR = `ASSET_${Date.now()}`;
             setQrCode(simulatedQR);
+
+            // Log simulated QR scan
+            if (user?.id) {
+              try {
+                await auditLogService.logQRCodeScanned(
+                  user.id,
+                  undefined,
+                  simulatedQR
+                );
+              } catch (auditError) {
+                console.error("Failed to log QR scan:", auditError);
+              }
+            }
           }
 
           await cameraService.stopCamera(stream);
@@ -324,6 +467,19 @@ export default function AssetsPage() {
     } catch (err) {
       setError("Camera access failed. Please try manual entry.");
       setIsScanning(false);
+
+      // Log unexpected error
+      if (user?.id) {
+        try {
+          await auditLogService.logError(
+            user.id,
+            "QR_SCAN",
+            `Unexpected QR scan error: ${err}`
+          );
+        } catch (auditError) {
+          console.error("Failed to log QR scan error:", auditError);
+        }
+      }
     }
   };
 

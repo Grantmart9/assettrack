@@ -83,20 +83,6 @@ export default function Navigation() {
                 </NavigationMenuItem>
               )}
 
-              {/* Reports */}
-              {user && (
-                <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/reports"
-                      className="text-gray-700 hover:text-indigo-600 transition-colors font-medium"
-                    >
-                      Reports
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              )}
-
               {/* Admin */}
               {user && (
                 <NavigationMenuItem>
@@ -112,7 +98,6 @@ export default function Navigation() {
               )}
             </NavigationMenuList>
           </NavigationMenu>
-
           {/* Auth Buttons */}
           <div className="hidden sm:flex items-center space-x-4">
             {user ? (

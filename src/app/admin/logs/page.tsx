@@ -2,34 +2,64 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/supabase/context";
+import { auditLogService, type AuditLog } from "@/lib/services/auditLogService";
 
-// Mock log data - in a real implementation, this would come from a database
-const mockLogs = [
-  { id: 1, timestamp: "2023-06-15T10:30:00Z", level: "INFO", message: "User john@example.com logged in", user: "john@example.com" },
-  { id: 2, timestamp: "2023-06-15T11:45:00Z", level: "INFO", message: "Asset AST-001 checked out to Jane Doe", user: "jane@example.com" },
-  { id: 3, timestamp: "2023-06-15T12:15:00Z", level: "WARN", message: "Failed login attempt for user unknown@example.com", user: "unknown@example.com" },
-  { id: 4, timestamp: "2023-06-15T13:30:00Z", level: "INFO", message: "Asset AST-002 inspection completed", user: "inspector@example.com" },
-  { id: 5, timestamp: "2023-06-15T14:20:00Z", level: "ERROR", message: "Database connection timeout", user: "system" },
-  { id: 6, timestamp: "2023-06-15T15:10:00Z", level: "INFO", message: "User jane@example.com logged out", user: "jane@example.com" },
-  { id: 7, timestamp: "2023-06-15T16:05:00Z", level: "INFO", message: "Asset AST-003 quarantined due to damage", user: "admin@example.com" },
-  { id: 8, timestamp: "2023-06-15T17:30:00Z", level: "WARN", message: "Low disk space on server (15% remaining)", user: "system" },
-];
+// Interface for formatted log entries
+interface FormattedLog {
+  id: string;
+  timestamp: string;
+  level: "INFO" | "WARN" | "ERROR";
+  message: string;
+  user: string;
+  action: string;
+  assetId: string | null;
+  details: string | null;
+}
 
 export default function ViewLogsPage() {
   const { user } = useAuth();
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<FormattedLog[]>([]);
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // In a real implementation, you would fetch logs from a database
-    setLogs(mockLogs);
+    const fetchLogs = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const { data: auditLogs, error: fetchError } =
+          await auditLogService.getAll({
+            limit: 100, // Limit to most recent 100 logs
+          });
+
+        if (fetchError) {
+          throw new Error(fetchError.message || "Failed to fetch audit logs");
+        }
+
+        // Format the logs for UI display
+        const formattedLogs = auditLogs.map((log) =>
+          auditLogService.formatForUI(log)
+        );
+        setLogs(formattedLogs);
+      } catch (err) {
+        console.error("Error fetching logs:", err);
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLogs();
   }, []);
 
-  const filteredLogs = logs.filter(log => {
+  const filteredLogs = logs.filter((log) => {
     const matchesFilter = filter === "ALL" || log.level === filter;
-    const matchesSearch = log.message.toLowerCase().includes(search.toLowerCase()) || 
-                          log.user.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch =
+      log.message.toLowerCase().includes(search.toLowerCase()) ||
+      log.user.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -38,7 +68,9 @@ export default function ViewLogsPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
-          <p className="mt-2 text-gray-600">You must be logged in to view this page.</p>
+          <p className="mt-2 text-gray-600">
+            You must be logged in to view this page.
+          </p>
         </div>
       </div>
     );
@@ -49,10 +81,19 @@ export default function ViewLogsPage() {
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <h1 className="text-3xl font-bold text-gray-900 mb-6">View Logs</h1>
-          
+
+          {/* Error message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
           <div className="bg-white shadow overflow-hidden sm:rounded-lg">
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-              <h2 className="text-lg leading-6 font-medium text-gray-900">System Activity Logs</h2>
+              <h2 className="text-lg leading-6 font-medium text-gray-900">
+                System Activity Logs
+              </h2>
               <p className="mt-1 max-w-2xl text-sm text-gray-500">
                 View system activity and error logs
               </p>
@@ -60,7 +101,10 @@ export default function ViewLogsPage() {
             <div className="px-4 py-5 sm:px-6">
               <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div className="mb-2 sm:mb-0">
-                  <label htmlFor="filter" className="mr-2 text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="filter"
+                    className="mr-2 text-sm font-medium text-gray-700"
+                  >
                     Filter by level:
                   </label>
                   <select
@@ -76,7 +120,10 @@ export default function ViewLogsPage() {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="search" className="mr-2 text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="search"
+                    className="mr-2 text-sm font-medium text-gray-700"
+                  >
                     Search:
                   </label>
                   <input
@@ -89,22 +136,39 @@ export default function ViewLogsPage() {
                   />
                 </div>
               </div>
-              
-              {filteredLogs.length > 0 ? (
+
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mr-3"></div>
+                  <span className="text-gray-500">Loading logs...</span>
+                </div>
+              ) : filteredLogs.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
                           Timestamp
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
                           Level
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
                           Message
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
                           User
                         </th>
                       </tr>
@@ -116,11 +180,15 @@ export default function ViewLogsPage() {
                             {new Date(log.timestamp).toLocaleString()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              log.level === "INFO" ? "bg-blue-100 text-blue-800" :
-                              log.level === "WARN" ? "bg-yellow-100 text-yellow-800" :
-                              "bg-red-100 text-red-800"
-                            }`}>
+                            <span
+                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                log.level === "INFO"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : log.level === "WARN"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
                               {log.level}
                             </span>
                           </td>
@@ -136,7 +204,9 @@ export default function ViewLogsPage() {
                   </table>
                 </div>
               ) : (
-                <p className="text-gray-500">No logs found matching your criteria.</p>
+                <p className="text-gray-500">
+                  No logs found matching your criteria.
+                </p>
               )}
             </div>
           </div>
