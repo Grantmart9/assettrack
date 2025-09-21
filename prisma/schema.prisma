@@ -1,143 +1,157 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Prisma schema file - defines the database models and relationships for the AssetTrack application
+// Learn more about Prisma schema: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client-js" // Generates TypeScript client for database operations
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "postgresql" // Database provider: PostgreSQL (used by Supabase)
+  url      = env("DATABASE_URL") // Connection URL from environment
 }
 
+// Company model - represents companies that own assets, users, job sites, and vehicles
 model Company {
-  id        String     @id @default(uuid())
-  name      String
-  slug      String     @unique
-  logo      String?
-  theme     String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String     @id @default(uuid()) // Unique identifier for company
+  name      String     // Company name
+  slug      String     @unique // Unique slug for company (used in URLs)
+  logo      String?    // Optional company logo URL
+  theme     String?    // Optional company theme configuration
+  createdAt DateTime   @default(now()) // Timestamp when company was created
+  updatedAt DateTime   @updatedAt // Timestamp when company was last updated (auto-managed)
 
+  // Relations - one company has many users, assets, job sites, vehicles
   users     User[]
   assets    Asset[]
   jobSites  JobSite[]
   vehicles  Vehicle[]
 }
 
+// User model - represents users within a company, with roles for access control
 model User {
-  id        String     @id @default(uuid())
-  email     String     @unique
-  name      String?
-  avatar    String?
-  role      String     @default("Worker")
-  companyId String
-  company   Company    @relation(fields: [companyId], references: [id])
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String     @id @default(uuid()) // Unique identifier for user
+  email     String     @unique // Unique email for user authentication
+  name      String?    // Optional user name
+  avatar    String?    // Optional user avatar URL
+  role      String     @default("Worker") // User role (e.g., Worker, Admin)
+  companyId String     // Foreign key to company
+  company   Company    @relation(fields: [companyId], references: [id]) // Relation to company
+  createdAt DateTime   @default(now()) // Timestamp when user was created
+  updatedAt DateTime   @updatedAt // Timestamp when user was last updated
 
+  // Relations - one user can have many audit logs
   auditLogs AuditLog[]
 }
 
+// Asset model - represents physical assets tracked in the system, with QR code support for scanning
 model Asset {
-  id          String         @id @default(uuid())
-  name        String
-  category    String
-  serial      String?
-  purchaseDate DateTime?
-  photos      String[]
-  documents   String[]
-  condition   String?
-  status      String         @default("Available")
-  companyId   String
-  company     Company        @relation(fields: [companyId], references: [id])
-  assignments Assignment[]
-  inspections Inspection[]
-  tags        AssetTag[]
-  locationEvents LocationEvent[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id          String         @id @default(uuid()) // Unique UUID identifier for asset
+  name        String         // Asset name
+  category    String         // Asset category (e.g., Electronics, Tools)
+  serial      String?       // Optional serial number
+  qr          String?       // QR code value (slug or URL) for scanning and identification
+  purchaseDate DateTime?    // Optional purchase date
+  photos      String[]      // Array of photo URLs for the asset
+  documents   String[]      // Array of document URLs for the asset
+  condition   String?       // Asset condition (e.g., Good, Poor)
+  status      String        @default("Available") // Asset status (Available, Checked Out, Maintenance, Retired)
+  companyId   String        // Foreign key to company
+  company     Company       @relation(fields: [companyId], references: [id]) // Relation to company
+  assignments Assignment[]  // One asset can have many assignments (check-outs)
+  inspections Inspection[]  // One asset can have many inspections
+  tags        AssetTag[]    // One asset can have many tags
+  locationEvents LocationEvent[] // One asset can have many location events
+  createdAt   DateTime      @default(now()) // Timestamp when asset was created
+  updatedAt   DateTime      @updatedAt // Timestamp when asset was last updated
 
+  // Relations - one asset can be referenced in many audit logs
   auditLogs   AuditLog[]
 }
 
+// AssetTag model - allows tagging assets with additional identifiers (e.g., RFID, custom tags)
 model AssetTag {
-  id         String   @id @default(uuid())
-  type       String
-  identifier String
-  assetId    String
-  asset      Asset    @relation(fields: [assetId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id         String   @id @default(uuid()) // Unique identifier for tag
+  type       String   // Type of tag (e.g., RFID, Barcode)
+  identifier String   // Tag identifier value
+  assetId    String   // Foreign key to asset
+  asset      Asset    @relation(fields: [assetId], references: [id]) // Relation to asset
+  createdAt  DateTime @default(now()) // Timestamp when tag was created
+  updatedAt  DateTime @updatedAt // Timestamp when tag was last updated
 }
 
+// Assignment model - tracks asset check-out/in assignments to users/sites/vehicles
 model Assignment {
-  id         String   @id @default(uuid())
-  assetId    String
-  asset      Asset    @relation(fields: [assetId], references: [id])
-  assignedTo String
-  site       String?
-  vehicle    String?
-  outAt      DateTime @default(now())
-  dueAt      DateTime?
-  inAt       DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id         String   @id @default(uuid()) // Unique identifier for assignment
+  assetId    String   // Foreign key to asset
+  asset      Asset    @relation(fields: [assetId], references: [id]) // Relation to asset
+  assignedTo String   // User ID the asset is assigned to
+  site       String?  // Optional job site
+  vehicle    String?  // Optional vehicle
+  outAt      DateTime @default(now()) // Check-out timestamp
+  dueAt      DateTime? // Optional due date for return
+  inAt       DateTime? // Check-in timestamp (null if checked out)
+  createdAt  DateTime @default(now()) // Timestamp when assignment was created
+  updatedAt  DateTime @updatedAt // Timestamp when assignment was last updated
 }
 
+// Inspection model - records inspections for assets
 model Inspection {
-  id        String   @id @default(uuid())
-  assetId   String
-  asset     Asset    @relation(fields: [assetId], references: [id])
-  checklist String
-  result    String
-  signedBy  String?
-  nextDue   DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(uuid()) // Unique identifier for inspection
+  assetId   String   // Foreign key to asset
+  asset     Asset    @relation(fields: [assetId], references: [id]) // Relation to asset
+  checklist String   // Inspection checklist data (JSON or text)
+  result    String   // Inspection result
+  signedBy  String?  // Optional user who signed off
+  nextDue   DateTime? // Next inspection due date
+  createdAt DateTime @default(now()) // Timestamp when inspection was created
+  updatedAt DateTime @updatedAt // Timestamp when inspection was last updated
 }
 
+// LocationEvent model - tracks location updates for assets (e.g., GPS check-ins)
 model LocationEvent {
-  id        String   @id @default(uuid())
-  assetId   String
-  asset     Asset    @relation(fields: [assetId], references: [id])
-  method    String
-  latitude  Float?
-  longitude Float?
-  timestamp DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(uuid()) // Unique identifier for location event
+  assetId   String   // Foreign key to asset
+  asset     Asset    @relation(fields: [assetId], references: [id]) // Relation to asset
+  method    String   // Method of location capture (e.g., GPS, Manual)
+  latitude  Float?   // Optional latitude
+  longitude Float?   // Optional longitude
+  timestamp DateTime @default(now()) // Event timestamp
+  createdAt DateTime @default(now()) // Timestamp when event was created
+  updatedAt DateTime @updatedAt // Timestamp when event was last updated
 }
 
+// JobSite model - represents job sites where assets can be assigned
 model JobSite {
-  id        String   @id @default(uuid())
-  name      String
-  address   String?
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(uuid()) // Unique identifier for job site
+  name      String   // Job site name
+  address   String?  // Optional address
+  companyId String   // Foreign key to company
+  company   Company  @relation(fields: [companyId], references: [id]) // Relation to company
+  createdAt DateTime @default(now()) // Timestamp when job site was created
+  updatedAt DateTime @updatedAt // Timestamp when job site was last updated
 }
 
+// Vehicle model - represents vehicles that assets can be assigned to
 model Vehicle {
-  id        String   @id @default(uuid())
-  name      String
-  plate     String?
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(uuid()) // Unique identifier for vehicle
+  name      String   // Vehicle name
+  plate     String?  // Optional license plate
+  companyId String   // Foreign key to company
+  company   Company  @relation(fields: [companyId], references: [id]) // Relation to company
+  createdAt DateTime @default(now()) // Timestamp when vehicle was created
+  updatedAt DateTime @updatedAt // Timestamp when vehicle was last updated
 }
 
+// AuditLog model - logs all user actions for auditing and compliance
 model AuditLog {
-  id        String   @id @default(uuid())
-  action    String
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  assetId   String?
-  asset     Asset?   @relation(fields: [assetId], references: [id])
-  details   String?
-  timestamp DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(uuid()) // Unique identifier for log entry
+  action    String   // Action type (e.g., ASSET_CREATE, ASSET_CHECKIN)
+  userId    String?  // Optional foreign key to user
+  user      User?    @relation(fields: [userId], references: [id]) // Relation to user
+  assetId   String?  // Optional foreign key to asset
+  asset     Asset?   @relation(fields: [assetId], references: [id]) // Relation to asset
+  details   String?  // Additional details for the action
+  timestamp DateTime @default(now()) // Timestamp of the action
+  createdAt DateTime @default(now()) // Timestamp when log was created
+  updatedAt DateTime @updatedAt // Timestamp when log was last updated
 }

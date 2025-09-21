@@ -1,22 +1,41 @@
+// AssetsPage - React component for managing assets: listing, creating, editing, deleting, and QR code scanning for new assets
 "use client";
 
-import { useState, useEffect } from "react";
+// Import React hooks for state, effect, and refs
+import { useState, useEffect, useRef } from "react";
+
+// Import protected route component to ensure authentication
 import ProtectedRoute from "@/components/ProtectedRoute";
+
+// Import framer-motion for animations
 import { motion } from "framer-motion";
+
+// Import jsQR for QR code detection from camera
+import jsQR from "jsqr";
+
+// Import AssetSummaryGrid component for dashboard summary
 import AssetSummaryGrid from "@/components/AssetSummaryGrid";
+
+// Import Next.js Link for navigation
 import Link from "next/link";
+
+// Import asset service and types for CRUD operations
 import {
   assetService,
   type AssetInsert,
   type Asset,
 } from "@/lib/services/assetService";
+
+// Import auth hook for user authentication
 import { useAuth } from "@/lib/supabase/context";
-import cameraService from "@/lib/services/cameraService";
+
+// Import audit log service for logging actions
 import { auditLogService } from "@/lib/services/auditLogService";
 
+// Constant for scale animation on hover
 const scale_amount = 1.02;
 
-// Generate a random ID for new assets
+// Utility function to generate a simple random ID for new assets (in production, use UUID from backend)
 const generateAssetId = (): string => {
   return (
     "asset_" +
@@ -26,15 +45,18 @@ const generateAssetId = (): string => {
   );
 };
 
+// Main component for the assets page
 export default function AssetsPage() {
-  const [showForm, setShowForm] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [qrCode, setQrCode] = useState("");
+  // State for form and UI management
+  const [showForm, setShowForm] = useState(false); // Controls visibility of the add asset modal
+  const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for form submission
+  const [isScanning, setIsScanning] = useState(false); // Controls QR scanning state
+  const [qrCode, setQrCode] = useState(""); // Stores the scanned or entered QR code value
   const [formData, setFormData] = useState<Partial<AssetInsert>>({
     name: "",
     category: "",
     serial: "",
+    qr: "",
     condition: "",
     status: "available",
     purchaseDate: "",
@@ -42,23 +64,30 @@ export default function AssetsPage() {
     warrantiesDate: "",
     photos: [],
     documents: [],
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [isLoadingAssets, setIsLoadingAssets] = useState(true);
-  const [assetsError, setAssetsError] = useState<string | null>(null);
-  const [inspectionAssets, setInspectionAssets] = useState<Asset[]>([]);
-  const [isLoadingInspections, setIsLoadingInspections] = useState(true);
-  const [inspectionsError, setInspectionsError] = useState<string | null>(null);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-  const [detailMode, setDetailMode] = useState<"view" | "edit" | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [updateError, setUpdateError] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState<Partial<Asset>>({});
+  }); // Form data for new asset creation
+  const [error, setError] = useState<string | null>(null); // General error state for form
+  const [assets, setAssets] = useState<Asset[]>([]); // List of all assets
+  const [isLoadingAssets, setIsLoadingAssets] = useState(true); // Loading state for assets list
+  const [assetsError, setAssetsError] = useState<string | null>(null); // Error state for assets loading
+  const [inspectionAssets, setInspectionAssets] = useState<Asset[]>([]); // Assets for inspection dashboard
+  const [isLoadingInspections, setIsLoadingInspections] = useState(true); // Loading state for inspection data
+  const [inspectionsError, setInspectionsError] = useState<string | null>(null); // Error state for inspections
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null); // Selected asset for view/edit modal
+  const [detailMode, setDetailMode] = useState<"view" | "edit" | null>(null); // Mode for asset detail modal (view or edit)
+  const [isUpdating, setIsUpdating] = useState(false); // Loading state for asset update
+  const [updateError, setUpdateError] = useState<string | null>(null); // Error state for update
+  const [editFormData, setEditFormData] = useState<Partial<Asset>>({
+    qr: "",
+  }); // Form data for editing asset
 
+  // Refs for camera functionality in QR scanning
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Get current user from auth context
   const { user } = useAuth();
 
-  // Fetch assets from Supabase
+  // Fetch all assets from the service
   const fetchAssets = async () => {
     setIsLoadingAssets(true);
     setAssetsError(null);
@@ -80,7 +109,7 @@ export default function AssetsPage() {
     }
   };
 
-  // Fetch last 10 assets for inspections
+  // Fetch last 10 assets for inspection statistics
   const fetchInspectionAssets = async () => {
     setIsLoadingInspections(true);
     setInspectionsError(null);
@@ -136,7 +165,7 @@ export default function AssetsPage() {
     }
   };
 
-  // Calculate inspection statistics from real data
+  // Calculate inspection statistics from fetched data
   const getInspectionStats = () => {
     const now = new Date();
     const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -176,14 +205,14 @@ export default function AssetsPage() {
     fetchInspectionAssets();
   }, []);
 
-  // Handlers for asset detail popup
+  // Handler to view asset details
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
     setDetailMode("view");
     setUpdateError(null);
   };
 
-  // Handlers for asset delete
+  // Handler to delete an asset with confirmation and audit logging
   const handleDeleteAsset = async (asset: Asset) => {
     if (
       !window.confirm(
@@ -252,18 +281,25 @@ export default function AssetsPage() {
     }
   };
 
+  // Handler to edit an asset
   const handleEditAsset = (asset: Asset) => {
     setSelectedAsset(asset);
     setDetailMode("edit");
+    setEditFormData({
+      ...asset,
+      qr: asset.qr || "",
+    });
     setUpdateError(null);
   };
 
+  // Handler to close the detail modal
   const handleCloseDetail = () => {
     setSelectedAsset(null);
     setDetailMode(null);
     setUpdateError(null);
   };
 
+  // Handler to update an asset with audit logging
   const handleUpdateAsset = async (updatedAsset: Partial<Asset>) => {
     if (!selectedAsset) return;
 
@@ -345,11 +381,13 @@ export default function AssetsPage() {
     }
   };
 
+  // Handler to open the add asset form
   const handleAddClick = () => {
     setShowForm(true);
     setError(null);
   };
 
+  // Handler to close the add asset form and reset state
   const handleCloseForm = () => {
     setShowForm(false);
     setQrCode("");
@@ -357,6 +395,7 @@ export default function AssetsPage() {
       name: "",
       category: "",
       serial: "",
+      qr: "",
       condition: "",
       status: "available",
       purchaseDate: "",
@@ -368,6 +407,7 @@ export default function AssetsPage() {
     setError(null);
   };
 
+  // Handler for form input changes
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -378,111 +418,68 @@ export default function AssetsPage() {
     }));
   };
 
-  const handleQRScan = async () => {
-    setIsScanning(true);
-    setError(null);
-
+  // Start camera for QR scanning in the form
+  const startCamera = async () => {
     try {
-      const { stream, error: cameraError } = await cameraService.startCamera();
-
-      if (cameraError) {
-        setError("Failed to access camera. Please check permissions.");
-        setIsScanning(false);
-
-        // Log camera error
-        if (user?.id) {
-          try {
-            await auditLogService.logError(
-              user.id,
-              "QR_SCAN",
-              `Camera access failed: ${cameraError}`
-            );
-          } catch (auditError) {
-            console.error("Failed to log QR scan error:", auditError);
-          }
-        }
-        return;
-      }
-
-      if (stream) {
-        // In a real implementation, you would show camera preview and scan QR
-        // For now, we'll simulate a QR code scan
-        setTimeout(async () => {
-          const { data: qrData, error: scanError } =
-            await cameraService.scanQRCode(stream);
-
-          if (scanError) {
-            setError("Failed to scan QR code. Please try again.");
-
-            // Log scan error
-            if (user?.id) {
-              try {
-                await auditLogService.logError(
-                  user.id,
-                  "QR_SCAN",
-                  `QR scan failed: ${scanError}`
-                );
-              } catch (auditError) {
-                console.error("Failed to log QR scan error:", auditError);
-              }
-            }
-          } else if (qrData) {
-            setQrCode(qrData);
-
-            // Log successful QR scan
-            if (user?.id) {
-              try {
-                await auditLogService.logQRCodeScanned(
-                  user.id,
-                  undefined,
-                  qrData
-                );
-              } catch (auditError) {
-                console.error("Failed to log QR scan:", auditError);
-              }
-            }
-          } else {
-            // Simulate a successful scan for demo purposes
-            const simulatedQR = `ASSET_${Date.now()}`;
-            setQrCode(simulatedQR);
-
-            // Log simulated QR scan
-            if (user?.id) {
-              try {
-                await auditLogService.logQRCodeScanned(
-                  user.id,
-                  undefined,
-                  simulatedQR
-                );
-              } catch (auditError) {
-                console.error("Failed to log QR scan:", auditError);
-              }
-            }
-          }
-
-          await cameraService.stopCamera(stream);
-          setIsScanning(false);
-        }, 2000); // Simulate 2 second scan
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
       }
     } catch (err) {
-      setError("Camera access failed. Please try manual entry.");
-      setIsScanning(false);
+      setError("Error accessing camera: " + (err as Error).message);
+    }
+  };
 
-      // Log unexpected error
-      if (user?.id) {
-        try {
-          await auditLogService.logError(
-            user.id,
-            "QR_SCAN",
-            `Unexpected QR scan error: ${err}`
-          );
-        } catch (auditError) {
-          console.error("Failed to log QR scan error:", auditError);
+  // Stop camera stream
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      const tracks = stream.getTracks();
+      tracks.forEach((track) => track.stop());
+    }
+  };
+
+  // Capture image from video for QR detection
+  const captureImage = () => {
+    if (videoRef.current && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      const context = canvas.getContext("2d");
+
+      if (context) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code) {
+          setQrCode(code.data);
+        } else {
+          setError("No QR code detected. Please try again.");
         }
+        stopCamera();
+        setIsScanning(false);
       }
     }
   };
 
+  // Handler to start QR scanning in the form
+  const handleQRScan = async () => {
+    setIsScanning(true);
+    setError(null);
+    await startCamera();
+  };
+
+  // Handler for form submission to create new asset
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -509,6 +506,7 @@ export default function AssetsPage() {
         name: formData.name.trim(),
         category: formData.category.trim(),
         serial: formData.serial?.trim() || null,
+        qr: qrCode.trim() || null,
         condition: formData.condition?.trim() || null,
         status: formData.status || "available",
         purchaseDate: formData.purchaseDate
@@ -547,7 +545,7 @@ export default function AssetsPage() {
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50 p-8 relative">
         <div className="max-w-7xl mx-auto">
-          {/* ✅ Modal Form Overlay */}
+          {/* Modal Form Overlay for adding new asset */}
           {showForm && (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -616,21 +614,44 @@ export default function AssetsPage() {
                         placeholder="Enter QR code or scan below"
                         className="block w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
-                      <button
-                        type="button"
-                        onClick={handleQRScan}
-                        disabled={isScanning || isSubmitting}
-                        className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        {isScanning ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Scanning...
-                          </>
-                        ) : (
-                          <>📷 Scan QR Code</>
-                        )}
-                      </button>
+                      <input type="hidden" name="qr" value={qrCode} />
+                      {!isScanning ? (
+                        <button
+                          type="button"
+                          onClick={handleQRScan}
+                          disabled={isSubmitting}
+                          className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          📷 Scan QR Code
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            className="w-full h-48 bg-gray-200 rounded-md object-cover"
+                          />
+                          <canvas ref={canvasRef} className="hidden" />
+                          <button
+                            type="button"
+                            onClick={captureImage}
+                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center gap-2"
+                          >
+                            📸 Capture QR Code
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              stopCamera();
+                              setIsScanning(false);
+                            }}
+                            className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                          >
+                            Cancel Scan
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -778,6 +799,23 @@ export default function AssetsPage() {
                             })
                           }
                           required
+                          className="block w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          QR Code
+                        </label>
+                        <input
+                          type="text"
+                          value={editFormData.qr || selectedAsset.qr || ""}
+                          onChange={(e) =>
+                            setEditFormData({
+                              ...editFormData,
+                              qr: e.target.value,
+                            })
+                          }
                           className="block w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                         />
                       </div>
@@ -998,6 +1036,15 @@ export default function AssetsPage() {
                               {selectedAsset.name}
                             </span>
                           </div>
+
+                          <div>
+                            <span className="block text-sm font-medium text-gray-900">
+                              QR Code
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              {selectedAsset.qr || "N/A"}
+                            </span>
+                          </div>
                           <div>
                             <span className="block text-sm font-medium text-gray-900">
                               Category
@@ -1173,7 +1220,7 @@ export default function AssetsPage() {
             <AssetSummaryGrid />
           </div>
 
-          {/* Assets Section */}
+          {/* Assets Section - main table listing all assets */}
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Assets</h1>
             <button
@@ -1252,7 +1299,7 @@ export default function AssetsPage() {
                   </tr>
                 ) : (
                   assets.map((asset) => {
-                    // Status color mapping
+                    // Status color mapping for badges
                     const getStatusBadge = (status: string) => {
                       const statusClasses = {
                         available: "bg-green-100 text-green-800",
@@ -1358,7 +1405,7 @@ export default function AssetsPage() {
             </motion.table>
           </div>
 
-          {/* Inspections Section */}
+          {/* Inspections Section - table showing assets with upcoming/overdue inspections */}
           <div className="mb-8 mt-5">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-3xl font-bold text-gray-900">Inspections</h2>
@@ -1420,7 +1467,7 @@ export default function AssetsPage() {
                           now.getTime() + 7 * 24 * 60 * 60 * 1000
                         );
 
-                        // Determine status
+                        // Determine inspection status badge
                         let statusBadge;
                         if (inspectionDate < now) {
                           statusBadge = (

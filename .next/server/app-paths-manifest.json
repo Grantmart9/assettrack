@@ -1,14 +1,1 @@
-{
-  "/dashboard/page": "app/dashboard/page.js",
-  "/scan/page": "app/scan/page.js",
-  "/assets/page": "app/assets/page.js",
-  "/login/page": "app/login/page.js",
-  "/api/logs/route": "app/api/logs/route.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/page": "app/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/admin/users/page": "app/admin/users/page.js",
-  "/admin/settings/page": "app/admin/settings/page.js",
-  "/admin/features/page": "app/admin/features/page.js",
-  "/admin/logs/page": "app/admin/logs/page.js"
-}
+{}

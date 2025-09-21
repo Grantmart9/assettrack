@@ -1,3 +1,12 @@
+/**
+ * Admin dashboard page for the AssetTrack application.
+ * Displays a grid of cards for admin functions: users, settings, features, logs, billing, reports.
+ * Fetches and displays user count, handles loading and error states.
+ * Protected for authenticated users only.
+ *
+ * Uses React hooks for data fetching, UI components for cards/buttons, framer-motion for animations.
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,15 +27,30 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
+/**
+ * Main AdminPage component - renders the admin dashboard.
+ * Fetches users on mount, renders cards with links to admin sections.
+ * Handles unauthenticated, loading, and error states.
+ *
+ * @returns {JSX.Element} The admin dashboard JSX with animated cards.
+ */
 export default function AdminPage() {
+  // Get current user from auth context
   const { user } = useAuth();
+
+  // State for users data, loading, and errors
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  /**
+   * useEffect hook to fetch users data on component mount.
+   * Calls userService.getUsers() and handles errors/loading.
+   */
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Fetch all users from the service
         const { data: usersData, error: usersError } =
           await userService.getUsers();
         if (usersError) {
@@ -44,6 +68,10 @@ export default function AdminPage() {
     fetchData();
   }, []);
 
+  /**
+   * Render access denied view if user not authenticated.
+   * Centered message prompting login.
+   */
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center text-center">
@@ -57,6 +85,10 @@ export default function AdminPage() {
     );
   }
 
+  /**
+   * Render loading spinner while fetching users.
+   * Uses Lucide React icon for spinner animation.
+   */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -65,6 +97,7 @@ export default function AdminPage() {
     );
   }
 
+  // Main admin dashboard render - authenticated user view
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -72,14 +105,16 @@ export default function AdminPage() {
           Admin Dashboard
         </h1>
 
+        {/* Error alert if data fetch failed */}
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
+        {/* Responsive grid for admin cards */}
         <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {/** Card Item Template */}
+          {/* Manage Users Card - shows user count and link */}
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -108,6 +143,7 @@ export default function AdminPage() {
             </Card>
           </motion.div>
 
+          {/* System Settings Card - link to settings page */}
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -128,6 +164,7 @@ export default function AdminPage() {
             </Card>
           </motion.div>
 
+          {/* Manage Features Card - link to features page */}
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -148,6 +185,7 @@ export default function AdminPage() {
             </Card>
           </motion.div>
 
+          {/* View Logs Card - link to logs page */}
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -166,6 +204,7 @@ export default function AdminPage() {
             </Card>
           </motion.div>
 
+          {/* Billing Card - link to billing page */}
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -185,6 +224,7 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </motion.div>
+          {/* Reports Card - link to reports page */}
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}

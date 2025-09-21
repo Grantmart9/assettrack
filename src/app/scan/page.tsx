@@ -1,95 +1,156 @@
+// ScanAssetPage - React component for the asset QR scanning page
+// Allows users to scan QR codes to view asset details and perform check-in/check-out operations
 "use client";
+
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/supabase/context";
 import { assetService } from "@/lib/services/assetService";
 import { motion } from "framer-motion";
+import jsQR from "jsqr";
 
+// Main component for scanning asset QR codes
 export default function ScanAssetPage() {
-  const { user } = useAuth();
-  const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState("");
-  const [assetData, setAssetData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { user } = useAuth(); // Get the current authenticated user from Supabase auth context
+  const [scanning, setScanning] = useState(false); // Controls whether the camera is active and scanning is ongoing
+  const [scanInterval, setScanInterval] = useState<number | null>(null); // Stores the animation frame ID for continuous scanning loop
+  const [scanResult, setScanResult] = useState(""); // Stores the raw QR code data after detection
+  const [assetData, setAssetData] = useState<any>(null); // Stores the fetched asset data after successful scan
+  const [loading, setLoading] = useState(false); // Loading state for fetching asset data
+  const [error, setError] = useState(""); // Error state for UI error messages
+  const videoRef = useRef<HTMLVideoElement>(null); // Ref for the video element to display camera feed
+  const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for the canvas used to capture video frames for QR detection
 
-  // Initialize camera
+  // Effect to initialize/stop camera and scanning loop when scanning state changes
   useEffect(() => {
     if (scanning) {
-      startCamera();
+      startCamera(); // Start camera stream when scanning begins
     }
 
+    // Cleanup function to stop camera and cancel scanning loop on unmount or state change
     return () => {
       stopCamera();
+      if (scanInterval) {
+        cancelAnimationFrame(scanInterval);
+      }
     };
+  }, [scanning, scanInterval]);
+
+  // Effect to start the continuous QR scanning loop when the video is ready and scanning is active
+  useEffect(() => {
+    if (videoRef.current && scanning) {
+      const video = videoRef.current;
+      const startScanning = () => {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          scanContinuously(); // Start the scanning loop once video has enough data
+        } else {
+          // Add listener to start scanning when video metadata is loaded
+          video.addEventListener("loadedmetadata", startScanning);
+          return () =>
+            video.removeEventListener("loadedmetadata", startScanning);
+        }
+      };
+      startScanning();
+    }
   }, [scanning]);
 
+  // Start camera stream - requests user media access for the rear camera
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { facingMode: "environment" }, // Use rear/environment facing camera
       });
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        videoRef.current.srcObject = stream; // Attach stream to video element
       }
     } catch (err) {
-      setError("Error accessing camera: " + (err as Error).message);
+      setError("Error accessing camera: " + (err as Error).message); // Set UI error if camera access fails
     }
   };
 
+  // Stop camera stream - stops all media tracks to release camera
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       const tracks = stream.getTracks();
-      tracks.forEach((track) => track.stop());
+      tracks.forEach((track) => track.stop()); // Stop each track in the stream
     }
   };
 
-  const captureImage = () => {
-    if (videoRef.current && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      const context = canvas.getContext("2d");
+  // Continuous QR code scanning loop using requestAnimationFrame for smooth performance
+  const scanContinuously = () => {
+    if (!videoRef.current || !canvasRef.current || !scanning) {
+      return; // Exit if no video, canvas, or scanning not active
+    }
 
-      if (context) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    const context = canvas.getContext("2d");
 
-        // In a real implementation, you would send this image to a QR code detection service
-        // For now, we'll just simulate a scan result
-        simulateScan();
+    // Draw current video frame to canvas and scan for QR
+    if (context && video.videoWidth > 0 && video.videoHeight > 0) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+      if (code) {
+        let assetId = code.data;
+        // Parse URL if it's a qrcode.link format - extracts asset ID from URL like https://qrcode.link/a/{assetId}
+        if (assetId.startsWith("https://qrcode.link/a/")) {
+          const url = new URL(assetId);
+          assetId = url.pathname.split("/").pop() || assetId;
+        }
+        console.log(
+          "DEBUG scan: Raw QR data:",
+          code.data,
+          "Extracted ID:",
+          assetId
+        );
+        setScanResult(code.data);
+        fetchAssetData(assetId);
+        setScanning(false); // Stop scanning after detection
+        return; // Stop the loop
       }
     }
+
+    // Continue scanning by requesting the next animation frame
+    const interval = requestAnimationFrame(scanContinuously);
+    setScanInterval(interval);
   };
 
-  const simulateScan = () => {
-    // Simulate scanning a QR code
-    const simulatedAssetId = "AST-001"; // This would normally come from QR code detection
-    setScanResult(simulatedAssetId);
-    fetchAssetData(simulatedAssetId);
-  };
-
+  // Fetch asset data by QR value - uses getByQr to lookup asset from the extracted ID
   const fetchAssetData = async (assetId: string) => {
+    console.log("DEBUG: Fetching asset with ID:", assetId); // Add logging
     setLoading(true);
     setError("");
 
     try {
-      // In a real implementation, you would query the database for the asset with this ID
-      // For now, we'll just simulate some asset data
-      const simulatedAssetData = {
-        id: assetId,
-        name: "Sample Asset",
-        category: "Electronics",
-        serial: "SN-123456",
-        status: "Available",
-        condition: "Good",
-        lastInspection: "2023-06-15",
-        nextInspection: "2023-12-15",
+      const { data: asset, error } = await assetService.getByQr(assetId);
+
+      if (error) {
+        setError("Error fetching asset data: " + error.message);
+        setAssetData(null);
+        return;
+      }
+
+      if (!asset) {
+        setError("Asset not found");
+        setAssetData(null);
+        return;
+      }
+
+      // Enhance asset data with formatted dates and defaults for display
+      const enhancedAssetData = {
+        ...asset,
+        lastInspection: asset.inspectionDate || "Not specified",
+        nextInspection: asset.warrantiesDate || "Not specified",
+        serial: asset.serial || "N/A",
+        condition: asset.condition || "Unknown",
       };
 
-      setAssetData(simulatedAssetData);
+      setAssetData(enhancedAssetData);
     } catch (err) {
       setError("Error fetching asset data: " + (err as Error).message);
     } finally {
@@ -97,23 +158,27 @@ export default function ScanAssetPage() {
     }
   };
 
+  // Handle asset check-in - calls service to check in the asset and refetches data
   const handleCheckIn = async () => {
-    if (!assetData) return;
+    if (!assetData || !user) return;
 
     setLoading(true);
     setError("");
 
     try {
-      // In a real implementation, you would call the assetService.checkIn method
-      // For now, we'll just simulate the check-in
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { error } = await assetService.checkIn(
+        assetData.id,
+        user.id,
+        assetData.name
+      );
 
-      // Update the asset data to reflect the check-in
-      setAssetData({
-        ...assetData,
-        status: "Checked In",
-        lastCheckedIn: new Date().toISOString(),
-      });
+      if (error) {
+        setError("Error checking in asset: " + error.message);
+        return;
+      }
+
+      // Refetch asset data to get updated information
+      await fetchAssetData(assetData.id);
 
       // Clear the scan result
       setScanResult("");
@@ -124,23 +189,37 @@ export default function ScanAssetPage() {
     }
   };
 
+  // Handle asset check-out - calls service to check out the asset and refetches data
   const handleCheckOut = async () => {
-    if (!assetData) return;
+    if (!assetData || !user) return;
 
     setLoading(true);
     setError("");
 
     try {
-      // In a real implementation, you would call the assetService.checkOut method
-      // For now, we'll just simulate the check-out
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Create basic assignment - in a full implementation, this would include form inputs for assignedTo, site, vehicle, dueAt
+      const assignment = {
+        assetId: assetData.id,
+        assignedTo: user.id, // Default to current user; in practice, select from users
+        outAt: new Date().toISOString(),
+        inAt: null,
+        // site: "", vehicle: "", dueAt: "" would be set from UI inputs
+      };
 
-      // Update the asset data to reflect the check-out
-      setAssetData({
-        ...assetData,
-        status: "Checked Out",
-        lastCheckedOut: new Date().toISOString(),
-      });
+      const { error } = await assetService.checkOut(
+        assetData.id,
+        assignment,
+        user.id,
+        assetData.name
+      );
+
+      if (error) {
+        setError("Error checking out asset: " + error.message);
+        return;
+      }
+
+      // Refetch asset data to get updated information
+      await fetchAssetData(assetData.id);
 
       // Clear the scan result
       setScanResult("");
@@ -151,6 +230,7 @@ export default function ScanAssetPage() {
     }
   };
 
+  // Render access denied if user not authenticated
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -175,9 +255,8 @@ export default function ScanAssetPage() {
               <div className="text-sm text-red-700">{error}</div>
             </div>
           )}
-
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Camera Section */}
+            {/* Camera Section - conditionally renders camera, scanning message, or rescan button */}
             <motion.div
               initial={{ opacity: 0, y: 0 }} // Start with 0 opacity, no vertical offset
               animate={{ opacity: 1, y: 0 }} // Animate to full opacity, no vertical offset
@@ -194,18 +273,21 @@ export default function ScanAssetPage() {
                 </p>
               </div>
               <div className="px-4 py-5 sm:px-6">
-                {!scanning ? (
-                  <div className="text-center">
-                    <button
-                      type="button"
-                      onClick={() => setScanning(true)}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Start Camera
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
+                <div className="space-y-4">
+                  {/* Show Start Scan button when not scanning and no asset data */}
+                  {!scanning && !assetData && (
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => setScanning(true)}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Start Scan
+                      </button>
+                    </div>
+                  )}
+                  {/* Show camera feed and scanning message when scanning */}
+                  {scanning && (
                     <div className="relative">
                       <video
                         ref={videoRef}
@@ -214,29 +296,35 @@ export default function ScanAssetPage() {
                         className="w-full h-auto max-h-96 bg-gray-200 rounded-lg"
                       />
                       <canvas ref={canvasRef} className="hidden" />
+                      <div className="flex justify-center">
+                        <p className="text-sm text-gray-500">
+                          Scanning for QR code...
+                        </p>
+                      </div>
                     </div>
+                  )}
+                  {/* Show Rescan button after asset is detected and scanned */}
+                  {assetData && !scanning && (
                     <div className="flex justify-center space-x-4">
                       <button
                         type="button"
-                        onClick={captureImage}
+                        onClick={() => {
+                          setScanning(true);
+                          setScanResult("");
+                          setAssetData(null);
+                          setError("");
+                        }}
                         className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
-                        Capture
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setScanning(false)}
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-base font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        Stop Camera
+                        Rescan
                       </button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </motion.div>
 
-            {/* Asset Information Section */}
+            {/* Asset Information Section - displays fetched asset details or loading/error states */}
             <motion.div
               initial={{ opacity: 0, y: 0 }} // Start with 0 opacity, no vertical offset
               animate={{ opacity: 1, y: 0 }} // Animate to full opacity, no vertical offset
@@ -368,7 +456,9 @@ export default function ScanAssetPage() {
                   <p className="text-gray-500">
                     {scanResult
                       ? "Loading asset information..."
-                      : "Scan a QR code to view asset information"}
+                      : !scanning && !assetData
+                      ? "Click 'Start Scan' to begin scanning an asset QR code"
+                      : "Point the camera at a QR code to scan"}
                   </p>
                 )}
               </div>

@@ -1,3 +1,11 @@
+/**
+ * Navigation component for the AssetTrack application.
+ * Renders fixed top nav bar with logo, desktop menu (dashboard, assets dropdown, admin),
+ * mobile scan icon, and auth buttons (login/signup or logout).
+ * Uses shadcn/ui NavigationMenu for dropdowns, framer-motion not used here.
+ * Handles logout with Supabase signOut and router push to login.
+ */
+
 "use client";
 
 import Link from "next/link";
@@ -14,10 +22,21 @@ import {
 import { ChevronDown } from "lucide-react";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 
+/**
+ * Navigation component - renders the app header navigation.
+ * Conditional rendering based on auth state.
+ *
+ * @returns {JSX.Element} Fixed nav bar with links and auth controls
+ */
 export default function Navigation() {
+  // Get user and signOut from auth context, router for navigation
   const { user, signOut } = useAuth();
   const router = useRouter();
 
+  /**
+   * handleLogout - signs out user and redirects to login.
+   * Catches and logs errors.
+   */
   const handleLogout = async () => {
     try {
       await signOut();
@@ -31,23 +50,24 @@ export default function Navigation() {
     <nav className="bg-white/80 backdrop-blur-md shadow-md fixed top-0 w-full z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
+          {/* Logo - links to dashboard, hidden on mobile */}
           <Link
             href="/dashboard"
             className="text-2xl font-semibold text-indigo-600 tracking-tight"
           >
             AssetTrack
           </Link>
+          {/* Mobile scan icon - links to scan page, visible on small screens */}
           <Link
             href="/scan"
             className="text-2xl font-semibold text-indigo-600 tracking-tight"
           >
             <QrCodeScannerIcon className="block md:hidden w-6 h-6" />
           </Link>
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - hidden on small screens */}
           <NavigationMenu className="hidden sm:flex">
             <NavigationMenuList className="flex space-x-6">
-              {/* Dashboard */}
+              {/* Dashboard link - shown for authenticated users */}
               {user && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
@@ -61,7 +81,7 @@ export default function Navigation() {
                 </NavigationMenuItem>
               )}
 
-              {/* Assets Dropdown with Descriptions */}
+              {/* Assets Dropdown - authenticated users only, with scan and view links */}
               {user && (
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className="flex items-center gap-1 text-gray-700 hover:text-indigo-600 transition-colors font-medium [&>svg]:hidden">
@@ -83,7 +103,7 @@ export default function Navigation() {
                 </NavigationMenuItem>
               )}
 
-              {/* Admin */}
+              {/* Admin link - authenticated users only */}
               {user && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
@@ -98,7 +118,7 @@ export default function Navigation() {
               )}
             </NavigationMenuList>
           </NavigationMenu>
-          {/* Auth Buttons */}
+          {/* Auth controls - login/signup or logout, hidden on small screens */}
           <div className="hidden sm:flex items-center space-x-4">
             {user ? (
               <>
@@ -133,7 +153,14 @@ export default function Navigation() {
 }
 
 /**
- * ListItem component for dropdown entries with title + description
+ * ListItem component - renders dropdown menu item with title and description.
+ * Used in NavigationMenuContent for assets dropdown.
+ *
+ * @param {Object} props - li props + custom
+ * @param {string} props.href - Link href
+ * @param {string} props.title - Item title
+ * @param {React.ReactNode} props.children - Description text
+ * @returns {JSX.Element} Dropdown list item
  */
 function ListItem({
   title,

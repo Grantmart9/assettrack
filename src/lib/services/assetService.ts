@@ -1,58 +1,92 @@
+// Import Supabase client utility for database operations
 import { getSupabaseClient } from "../supabase/client";
+
+// Import IndexedDB service for offline data caching
 import { indexedDBService } from "./indexedDBService";
+
+// Import database types generated from Supabase schema
 import { Database } from "../supabase/database.types";
+
+// Import audit log service for logging user actions
 import { auditLogService } from "./auditLogService";
 
-// Type for Asset
-export type Asset = Database["public"]["Tables"]["Asset"]["Row"];
+// Extend the base Asset row type with the custom 'qr' field to match our database schema
+// This type represents a complete asset record as stored in the database
+export type Asset = Database["public"]["Tables"]["Asset"]["Row"] & {
+  qr: string | null; // QR code value for asset identification
+};
 
-// Type for Asset insert
-export type AssetInsert = Database["public"]["Tables"]["Asset"]["Insert"];
+// Extend the insert type to allow optional 'qr' field during asset creation
+// Used when creating new assets, QR can be generated later
+export type AssetInsert = Database["public"]["Tables"]["Asset"]["Insert"] & {
+  qr?: string | null; // Optional QR code during asset creation
+};
 
-// Type for Asset update
-export type AssetUpdate = Database["public"]["Tables"]["Asset"]["Update"];
+// Extend the update type to allow optional 'qr' field during asset updates
+// Used when modifying existing assets, QR field is optional for updates
+export type AssetUpdate = Database["public"]["Tables"]["Asset"]["Update"] & {
+  qr?: string | null; // Optional QR code during asset updates
+};
 
-// Asset service
+// AssetService - central service for all asset-related operations: CRUD, QR handling, assignments, with offline support and audit logging
 export const assetService = {
-  // Get all assets
+  /**
+   * Get all assets - primary fetch method, tries Supabase first, falls back to IndexedDB for offline scenarios.
+   * This method provides offline-first functionality by attempting to fetch from the remote database first,
+   * then falling back to local IndexedDB storage if the remote request fails.
+   *
+   * @returns {Promise<{ data: Asset[]; error: any }>} Promise resolving to assets array and any error
+   */
   getAll: async (): Promise<{ data: Asset[]; error: any }> => {
     try {
-      // First try to get from Supabase
+      // First try to get from Supabase (remote database)
       const supabase = getSupabaseClient();
       const { data, error } = await supabase.from("asset").select("*");
 
+      // If successful, return the data
       if (!error && data) {
         return { data, error: null };
       }
 
-      // If Supabase fails, fallback to IndexedDB
+      // If Supabase fails, fallback to IndexedDB (local storage)
       const assets = await indexedDBService.getAssets();
       return { data: assets as Asset[], error: null };
     } catch (error) {
-      // If all else fails, return empty array
+      // If all else fails, return empty array with the error
       return { data: [], error };
     }
   },
 
-  // Get last N assets ordered by updatedAt (optimized for inspections)
+  /**
+   * Get last N assets ordered by updatedAt - optimized query for inspection dashboard showing recent activity.
+   * This method is designed for dashboard displays that need to show recently modified assets.
+   * Includes debug logging for development troubleshooting.
+   *
+   * @param {number} limit - Number of assets to return (default: 10)
+   * @returns {Promise<{ data: Asset[]; error: any }>} Promise resolving to recent assets array and any error
+   */
   getLastNAssets: async (
     limit: number = 10
   ): Promise<{ data: Asset[]; error: any }> => {
     try {
+      // Debug logging for development
       console.log(`🔍 DEBUG: Fetching last ${limit} assets from Supabase`);
       const supabase = getSupabaseClient();
 
+      // Query Supabase for most recently updated assets
       const { data, error } = await supabase
         .from("asset")
         .select("*")
         .order("updatedAt", { ascending: false })
         .limit(limit);
 
+      // Debug logging for development
       console.log(
         `✅ DEBUG: getLastNAssets - Fetched ${data?.length || 0} assets`
       );
       console.log("📊 DEBUG: getLastNAssets sample data:", data?.slice(0, 2));
 
+      // If successful, return the data
       if (!error && data) {
         return { data, error: null };
       }
@@ -69,23 +103,106 @@ export const assetService = {
         .slice(0, limit);
       return { data: sortedAssets, error: null };
     } catch (error) {
+      // Error logging for development
       console.error("🚨 DEBUG: Error in getLastNAssets:", error);
       return { data: [], error };
     }
   },
 
-  // Get asset by ID
+  /**
+   * Get asset by ID - fetches a single asset by its UUID primary key, handles potential duplicates by returning the most recent.
+   * This method is used when you need to retrieve a specific asset by its unique identifier.
+   * Includes debug logging and handles edge cases like duplicate records.
+   *
+   * @param {string} id - The UUID of the asset to retrieve
+   * @returns {Promise<{ data: Asset | null; error: any }>} Promise resolving to single asset or null, with any error
+   */
   getById: async (id: string): Promise<{ data: Asset | null; error: any }> => {
+    // Debug logging for development
+    console.log("DEBUG getById: Querying for ID:", id);
     const supabase = getSupabaseClient();
+
+    // Query Supabase for asset by ID, ordered by most recently updated
     const { data, error } = await supabase
       .from("asset")
       .select("*")
       .eq("id", id)
+      .order("updatedAt", { ascending: false });
+
+    // Debug logging for development
+    console.log("DEBUG getById response:", {
+      dataLength: data?.length || 0,
+      error: error?.message,
+    });
+
+    // Handle query errors
+    if (error) {
+      return { data: null, error };
+    }
+
+    // Handle successful response
+    if (data && data.length > 0) {
+      // Warn if multiple records found (shouldn't happen with UUID primary key)
+      if (data.length > 1) {
+        console.warn(
+          "WARNING: Multiple assets found for ID:",
+          id,
+          "- returning the most recent"
+        );
+      }
+      return { data: data[0], error: null };
+    } else {
+      // No asset found with this ID
+      return { data: null, error: { message: "No asset found" } };
+    }
+  },
+
+  // Get asset by QR value - fetches a single asset by the QR slug stored in the 'qr' column, handles duplicates by returning the most recent
+  getByQr: async (
+    qrValue: string
+  ): Promise<{ data: Asset | null; error: any }> => {
+    console.log("DEBUG getByQr: Querying for QR:", qrValue);
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("asset")
+      .select("*")
+      .eq("qr", qrValue)
+      .order("updatedAt", { ascending: false });
+    console.log("DEBUG getByQr response:", {
+      dataLength: data?.length || 0,
+      error: error?.message,
+    });
+    if (error) {
+      return { data: null, error };
+    }
+    if (data && data.length > 0) {
+      if (data.length > 1) {
+        console.warn(
+          "WARNING: Multiple assets found for QR:",
+          qrValue,
+          "- returning the most recent"
+        );
+      }
+      return { data: data[0], error: null };
+    } else {
+      return { data: null, error: { message: "No asset found for QR" } };
+    }
+  },
+
+  // Get asset by name - fetches a single asset by name, assuming names are unique
+  getByName: async (
+    name: string
+  ): Promise<{ data: Asset | null; error: any }> => {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("asset")
+      .select("*")
+      .eq("name", name)
       .single();
     return { data, error };
   },
 
-  // Create new asset
+  // Create new asset - inserts new asset into Supabase, syncs to IndexedDB, and stores QR if provided
   create: async (
     asset: AssetInsert
   ): Promise<{ data: Asset | null; error: any }> => {
@@ -111,7 +228,7 @@ export const assetService = {
     }
   },
 
-  // Update asset
+  // Update asset - updates existing asset in Supabase by ID, can update QR if changed
   update: async (
     id: string,
     asset: AssetUpdate
@@ -126,14 +243,14 @@ export const assetService = {
     return { data, error };
   },
 
-  // Delete asset
+  // Delete asset - deletes asset from Supabase by ID
   delete: async (id: string): Promise<{ error: any }> => {
     const supabase = getSupabaseClient();
     const { error } = await supabase.from("asset").delete().eq("id", id);
     return { error };
   },
 
-  // Generate QR code for asset
+  // Generate QR code for asset - placeholder; in production, integrate with a QR library to generate actual QR image or URL
   generateQRCode: async (
     assetId: string
   ): Promise<{ data: string; error: any }> => {
@@ -142,7 +259,7 @@ export const assetService = {
     return { data: `QR_CODE_${assetId}`, error: null };
   },
 
-  // Assign asset to user/site/vehicle
+  // Assign asset to user/site/vehicle - creates an assignment record for check-out, syncs to IndexedDB
   assign: async (
     assetId: string,
     assignment: any
@@ -169,7 +286,7 @@ export const assetService = {
     }
   },
 
-  // Check in asset (with audit logging)
+  // Check in asset (with audit logging) - updates the latest open assignment to checked-in state and logs the action
   checkIn: async (
     assetId: string,
     userId?: string,
@@ -178,7 +295,7 @@ export const assetService = {
     const supabase = getSupabaseClient();
 
     try {
-      // Update the assignment record in Supabase
+      // Update the assignment record in Supabase - targets the most recent open assignment (inAt=null)
       const { data, error } = await supabase
         .from("Assignment")
         .update({ inAt: new Date().toISOString() })
@@ -236,7 +353,7 @@ export const assetService = {
     }
   },
 
-  // Check out asset (with audit logging)
+  // Check out asset (with audit logging) - creates a new assignment record for the check-out and logs the action
   checkOut: async (
     assetId: string,
     assignment: any,

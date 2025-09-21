@@ -1,18 +1,46 @@
+/**
+ * AuditLogService module for the AssetTrack application.
+ * Handles logging of user actions, errors, system events to Supabase AuditLog table.
+ * Provides helpers for common logs (login, asset CRUD, check-in/out, QR scan, inspection).
+ * Supports filtering by action, user, asset; log levels (INFO/WARN/ERROR); UI formatting.
+ *
+ * Exports:
+ * - Types: AuditLog, AuditLogInsert, AuditLogUpdate
+ * - Functions: getAll, getById, create, logUserLogin, logUserLogout, logAssetCreated, etc., logError, logSystemEvent, getLogLevel, formatForUI
+ */
+
 import { getSupabaseClient } from "../supabase/client";
 import { Database } from "../supabase/database.types";
 
-// Type for AuditLog
+/**
+ * Type for AuditLog row from Supabase
+ */
 export type AuditLog = Database["public"]["Tables"]["AuditLog"]["Row"];
 
-// Type for AuditLog insert
+/**
+ * Type for AuditLog insert data
+ */
 export type AuditLogInsert = Database["public"]["Tables"]["AuditLog"]["Insert"];
 
-// Type for AuditLog update
+/**
+ * Type for AuditLog update data
+ */
 export type AuditLogUpdate = Database["public"]["Tables"]["AuditLog"]["Update"];
 
-// Audit Log service
+/**
+ * AuditLogService - central service for logging actions and errors.
+ * All methods async, return { data, error } or void for helpers.
+ */
 export const auditLogService = {
-  // Get all audit logs with optional limit and filtering
+  /**
+   * getAll - fetches audit logs with optional filters (limit, action, userId, assetId), ordered by timestamp desc.
+   * @param {Object} [options] - Filter options
+   * @param {number} [options.limit] - Max logs to return
+   * @param {string} [options.action] - Filter by action
+   * @param {string} [options.userId] - Filter by user
+   * @param {string} [options.assetId] - Filter by asset
+   * @returns {Promise<{ data: AuditLog[]; error: any }>} Logs array or error
+   */
   getAll: async (options?: {
     limit?: number;
     action?: string;
@@ -54,7 +82,11 @@ export const auditLogService = {
     }
   },
 
-  // Get audit log by ID
+  /**
+   * getById - fetches single audit log by ID.
+   * @param {string} id - Log ID
+   * @returns {Promise<{ data: AuditLog | null; error: any }>} Log or error
+   */
   getById: async (
     id: string
   ): Promise<{ data: AuditLog | null; error: any }> => {
@@ -72,7 +104,11 @@ export const auditLogService = {
     }
   },
 
-  // Create new audit log entry
+  /**
+   * create - inserts new audit log entry.
+   * @param {AuditLogInsert} auditLog - Log data to insert
+   * @returns {Promise<{ data: AuditLog | null; error: any }>} Created log or error
+   */
   create: async (
     auditLog: AuditLogInsert
   ): Promise<{ data: AuditLog | null; error: any }> => {
@@ -90,7 +126,13 @@ export const auditLogService = {
     }
   },
 
-  // Convenient helper functions for common audit logging actions
+  // Convenient helper functions for common audit logging actions - create log with predefined action/details
+
+  /**
+   * logUserLogin - logs user login event.
+   * @param {string} userId - User ID
+   * @param {string} [details] - Optional details
+   */
   logUserLogin: async (userId: string, details?: string): Promise<void> => {
     const now = new Date().toISOString();
     await auditLogService.create({
@@ -102,6 +144,11 @@ export const auditLogService = {
     });
   },
 
+  /**
+   * logUserLogout - logs user logout event.
+   * @param {string} userId - User ID
+   * @param {string} [details] - Optional details
+   */
   logUserLogout: async (userId: string, details?: string): Promise<void> => {
     const now = new Date().toISOString();
     await auditLogService.create({
@@ -113,6 +160,12 @@ export const auditLogService = {
     });
   },
 
+  /**
+   * logAssetCreated - logs asset creation.
+   * @param {string} userId - User ID
+   * @param {string} assetId - Asset ID
+   * @param {string} assetName - Asset name
+   */
   logAssetCreated: async (
     userId: string,
     assetId: string,
@@ -129,6 +182,13 @@ export const auditLogService = {
     });
   },
 
+  /**
+   * logAssetUpdated - logs asset update with changes.
+   * @param {string} userId - User ID
+   * @param {string} assetId - Asset ID
+   * @param {string} assetName - Asset name
+   * @param {string} [changes] - Change summary
+   */
   logAssetUpdated: async (
     userId: string,
     assetId: string,
@@ -148,6 +208,12 @@ export const auditLogService = {
     });
   },
 
+  /**
+   * logAssetDeleted - logs asset deletion.
+   * @param {string} userId - User ID
+   * @param {string} assetId - Asset ID
+   * @param {string} assetName - Asset name
+   */
   logAssetDeleted: async (
     userId: string,
     assetId: string,
@@ -164,6 +230,13 @@ export const auditLogService = {
     });
   },
 
+  /**
+   * logAssetCheckedOut - logs asset check-out to assignee.
+   * @param {string} userId - User ID
+   * @param {string} assetId - Asset ID
+   * @param {string} assetName - Asset name
+   * @param {string} [assignedTo] - Assignee
+   */
   logAssetCheckedOut: async (
     userId: string,
     assetId: string,
@@ -183,6 +256,12 @@ export const auditLogService = {
     });
   },
 
+  /**
+   * logAssetCheckedIn - logs asset check-in.
+   * @param {string} userId - User ID
+   * @param {string} assetId - Asset ID
+   * @param {string} assetName - Asset name
+   */
   logAssetCheckedIn: async (
     userId: string,
     assetId: string,
@@ -199,6 +278,12 @@ export const auditLogService = {
     });
   },
 
+  /**
+   * logQRCodeScanned - logs QR scan event.
+   * @param {string} userId - User ID
+   * @param {string} [assetId] - Asset ID if identified
+   * @param {string} [qrData] - QR data if no asset
+   */
   logQRCodeScanned: async (
     userId: string,
     assetId?: string,
@@ -219,6 +304,13 @@ export const auditLogService = {
     });
   },
 
+  /**
+   * logInspectionCompleted - logs inspection result.
+   * @param {string} userId - User ID
+   * @param {string} assetId - Asset ID
+   * @param {string} assetName - Asset name
+   * @param {string} [result] - Inspection result
+   */
   logInspectionCompleted: async (
     userId: string,
     assetId: string,

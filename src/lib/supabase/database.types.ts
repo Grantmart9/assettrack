@@ -79,6 +79,7 @@ export interface Database {
           name: string;
           category: string;
           serial: string | null;
+          qr: string | null;
           purchaseDate: string | null;
           inspectionDate: string | null;
           warrantiesDate: string | null;
@@ -95,6 +96,7 @@ export interface Database {
           name: string;
           category: string;
           serial?: string | null;
+          qr?: string | null;
           purchaseDate?: string | null;
           inspectionDate?: string | null;
           warrantiesDate?: string | null;
@@ -111,6 +113,7 @@ export interface Database {
           name?: string;
           category?: string;
           serial?: string | null;
+          qr?: string | null;
           purchaseDate?: string | null;
           inspectionDate?: string | null;
           warrantiesDate?: string | null;

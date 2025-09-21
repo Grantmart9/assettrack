@@ -1,10 +1,28 @@
-// src/components/WesternCapeMap.tsx
+/**
+ * WesternCapeMap component for the AssetTrack application.
+ * Renders a Google Map centered on Western Cape, South Africa.
+ * Supports pinning assets with markers and tooltips.
+ * Handles API key loading, restrictions to province, animations with framer-motion.
+ *
+ * Features:
+ * - Centers on Cape Town approx. lat/lng
+ * - Optional zoom and asset pins with labels
+ * - Province bounds restriction
+ * - Cleanup on unmount
+ * - Error handling for API key/missing
+ *
+ * Requires NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.local
+ */
+
 /// <reference types="@types/google.maps" />
 
 import { useEffect, useRef, useState } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 import { motion } from "framer-motion";
 
+/**
+ * Type for asset location data - used for map markers
+ */
 type Asset = {
   /** Unique id – useful if you later fetch real data */
   id: string | number;
@@ -16,10 +34,13 @@ type Asset = {
   label?: string;
 };
 
+/**
+ * Props for WesternCapeMap component
+ */
 type WesternCapeMapProps = {
   /** Tailwind / custom classNames applied to the map container */
   className?: string;
-  /** Zoom level (default 8) – increase to focus more on Cape Town */
+  /** Zoom level (default 8) – increase to focus more on Cape Town */
   zoom?: number;
   /** Optional list of asset locations to pin on the map */
   assets?: Asset[];
@@ -55,6 +76,12 @@ export function WesternCapeMap({
   /* --------------------------------------------------------------
      Initialise the Google Map (once)
   -------------------------------------------------------------- */
+  /**
+   * useEffect - initializes Google Map on mount or zoom change.
+   * Loads API with key from env, creates map with options (center, zoom, restriction to Western Cape).
+   * Catches load errors.
+   * Cleanup: nulls map instance.
+   */
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
@@ -81,7 +108,7 @@ export function WesternCapeMap({
           center: centre,
           zoom,
           mapTypeId: "roadmap",
-          // optional province‑level restriction
+          // Optional province-level restriction to Western Cape bounds
           restriction: {
             latLngBounds: {
               north: -25.9,
@@ -100,23 +127,28 @@ export function WesternCapeMap({
       })
       .catch((e) => console.error("❌ Google Maps failed to load:", e));
 
-    // cleanup ONLY the map object – markers are cleared separately below
+    // Cleanup: only null map instance (markers cleaned separately)
     return () => {
       setMapInstance(null);
     };
-  }, [zoom]); // zoom change re‑creates the map (rarely needed)
+  }, [zoom]); // Re-run on zoom change (rare)
 
   /* --------------------------------------------------------------
      Whenever the map is ready OR the asset list changes, (re)draw markers
   -------------------------------------------------------------- */
+  /**
+   * useEffect - adds/removes markers when map ready or assets change.
+   * Clears previous markers, adds new ones with positions, titles, optional InfoWindow on click.
+   * Supports custom icon uncomment.
+   */
   useEffect(() => {
     if (!mapInstance) return;
 
-    // ---- 1️⃣ Remove any previous markers ----
+    // 1. Remove any previous markers
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
-    // ---- 2️⃣ Add a marker for each asset ----
+    // 2. Add a marker for each asset
     assetList.forEach((asset) => {
       const marker = new google.maps.Marker({
         position: { lat: asset.lat, lng: asset.lng },
@@ -126,7 +158,7 @@ export function WesternCapeMap({
         // icon: "/assets/pin.svg",
       });
 
-      // Optional tooltip / InfoWindow
+      // Optional tooltip / InfoWindow for labeled assets
       if (asset.label) {
         const info = new google.maps.InfoWindow({
           content: `<div class="p-2 text-sm font-medium">${asset.label}</div>`,
@@ -137,11 +169,14 @@ export function WesternCapeMap({
 
       markersRef.current.push(marker);
     });
-  }, [mapInstance, assetList]); // re‑run when map is ready or assets change
+  }, [mapInstance, assetList]); // Re-run when map ready or assets change
 
   /* --------------------------------------------------------------
      Cleanup on component unmount – remove markers & listeners
   -------------------------------------------------------------- */
+  /**
+   * useEffect - cleanup on unmount: removes all markers from map.
+   */
   useEffect(() => {
     return () => {
       markersRef.current.forEach((m) => m.setMap(null));
@@ -152,10 +187,11 @@ export function WesternCapeMap({
   /* --------------------------------------------------------------
      Render – Framer‑Motion wrapper + Tailwind container
   -------------------------------------------------------------- */
+  // Render - framer-motion animated div as map container
   return (
     <motion.div
       ref={mapDiv}
-      className={`h-auto w-full ${className}`} // Tailwind: 384 px height, full width
+      className={`h-auto w-full ${className}`} // Tailwind: auto height, full width + props class
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
