@@ -12,7 +12,6 @@ import { useState, useEffect } from "react";
 interface DashboardAsset extends Asset {
   lat?: number;
   lng?: number;
-  qr?: string;
 }
 
 // Asset type for map component (simplified)

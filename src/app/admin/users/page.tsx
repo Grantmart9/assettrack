@@ -92,7 +92,7 @@ export default function AdminUsersPage() {
       }
 
       // Find current user in the users list to get their company ID
-      const userData = data?.find((u) => u.email === user?.email);
+      const userData = (data as User[])?.find((u) => u.email === user?.email);
       if (userData) {
         setCurrentUserData(userData);
       }

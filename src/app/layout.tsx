@@ -15,7 +15,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/supabase/context";
 import Navigation from "@/components/Navigation";
-import { Button } from "@mui/material";
 
 /**
  * Array of navigation items for the mobile bottom navigation bar.
@@ -38,14 +37,13 @@ const smallNavItems = [
 const NavigationSmall = () => (
   <div className="md:hidden fixed w-full bottom-0 mx-auto bg-white border-t border-gray-200 flex justify-around items-center h-16 z-50">
     {smallNavItems.map((item, index) => (
-      <Button
-        sx={{ color: "black", textTransform: "none" }}
+      <a
         href={item.href}
         key={index}
         className="text-gray-700 hover:bg-gray-100 focus:bg-gray-100 rounded-md px-3 py-2 text-sm font-medium"
       >
         {item.name}
-      </Button>
+      </a>
     ))}
   </div>
 );
