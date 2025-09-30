@@ -10,6 +10,7 @@
 
 import { useAuth } from "@/lib/supabase/context";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 /**
  * ProtectedRoute HOC - protects child components/pages from unauthenticated access.
@@ -25,6 +26,7 @@ export default function ProtectedRoute({
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
+  const router = useRouter();
 
   /**
    * useEffect - monitors auth state and redirects if not authenticated.
@@ -33,9 +35,10 @@ export default function ProtectedRoute({
   useEffect(() => {
     // Redirect to login if not loading and no user
     if (!loading && !user) {
-      window.location.href = "/login";
+      // Use Next.js router instead of window.location for better SPA behavior
+      router.push("/login");
     }
-  }, [user, loading]);
+  }, [user, loading, router]);
 
   // Show loading spinner while checking authentication
   if (loading) {

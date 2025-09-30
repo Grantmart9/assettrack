@@ -81,7 +81,7 @@ export default function RootLayout({
           {/* Desktop navigation header */}
           <Navigation />
           {/* Main content area with top padding for navigation, background, and minimum height */}
-          <main className="pt-16 bg-gray-50 min-h-screen">{children}</main>
+          <main className="pt-18 bg-gray-50 min-h-screen">{children}</main>
           {/* Mobile bottom navigation bar */}
           <NavigationSmall />
         </AuthProvider>

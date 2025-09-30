@@ -15,7 +15,9 @@ export default function LoginPage() {
 
   // Redirect if user is already logged in
   useEffect(() => {
+    console.log("Login page - auth state:", { user: !!user, authLoading });
     if (user && !authLoading) {
+      console.log("User is logged in, redirecting to dashboard");
       router.push("/dashboard");
     }
   }, [user, authLoading, router]);
@@ -24,23 +26,27 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    
+
     try {
       const { data, error: signInError } = await signIn(email, password);
-      
+
       if (signInError) {
         console.error("Error signing in:", signInError);
         // Handle different types of errors
         if (signInError.message?.includes("CORS")) {
-          setError("Connection failed. Please check your Supabase configuration in the .env file.");
+          setError(
+            "Connection failed. Please check your Supabase configuration in the .env file."
+          );
         } else if (signInError.message?.includes("Invalid login credentials")) {
           setError("Invalid email or password. Please try again.");
         } else {
-          setError("Error signing in. Please check your credentials and try again.");
+          setError(
+            "Error signing in. Please check your credentials and try again."
+          );
         }
         return;
       }
-      
+
       // Redirect to the dashboard on successful login
       router.push("/dashboard");
     } catch (err) {
@@ -72,9 +78,7 @@ export default function LoginPage() {
         </div>
         {error && (
           <div className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-700">
-              {error}
-            </div>
+            <div className="text-sm text-red-700">{error}</div>
           </div>
         )}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -126,7 +130,10 @@ export default function LoginPage() {
         <div className="text-center">
           <p className="text-sm text-gray-600">
             Don't have an account?{" "}
-            <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
+            <Link
+              href="/signup"
+              className="font-medium text-indigo-600 hover:text-indigo-500"
+            >
               Sign up
             </Link>
           </p>
