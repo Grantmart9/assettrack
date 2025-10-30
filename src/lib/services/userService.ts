@@ -22,35 +22,46 @@ export class UserService {
   }
 
   async getUsers() {
-    const { data, error } = await supabase.from("user").select("*");
+    const { data, error } = await supabase.from("User").select("*");
     return { data, error };
   }
 
   async createUser(user: UserInsert) {
-    // TODO: Fix Supabase type issues - temporarily disabled
-    console.log("User creation temporarily disabled due to type issues:", user);
-    return {
-      data: null,
-      error: { message: "User creation temporarily disabled" },
-    };
+    console.log("🔍 DEBUG: Creating user in database:", user);
+    const { data, error } = await supabase
+      .from("User")
+      .insert(user as any)
+      .select()
+      .single();
 
-    // Original implementation (commented out due to type issues):
-    // const { data, error } = await supabase
-    //   .from("user")
-    //   .insert(user)
-    //   .select()
-    //   .single();
-    // return { data, error };
+    console.log("🔍 DEBUG: User creation response:", { data, error });
+
+    if (error) {
+      console.error("🔍 DEBUG: User creation error details:", {
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        message: error.message,
+      });
+    }
+
+    return { data, error };
   }
 
   async updateUser(id: string, updates: UserUpdate) {
     // TODO: Fix Supabase type issues - temporarily disabled
-    console.log("User update temporarily disabled due to type issues:", { id, updates });
-    return { data: null, error: { message: "User update temporarily disabled" } };
+    console.log("User update temporarily disabled due to type issues:", {
+      id,
+      updates,
+    });
+    return {
+      data: null,
+      error: { message: "User update temporarily disabled" },
+    };
 
     // Original implementation (commented out due to type issues):
     // const { data, error } = await supabase
-    //   .from("user")
+    //   .from("User")
     //   .update(updates)
     //   .eq("id", id)
     //   .select()
@@ -59,7 +70,7 @@ export class UserService {
   }
 
   async deleteUser(id: string) {
-    const { error } = await supabase.from("user").delete().eq("id", id);
+    const { error } = await supabase.from("User").delete().eq("id", id);
     return { error };
   }
 
