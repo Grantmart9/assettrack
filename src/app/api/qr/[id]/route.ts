@@ -1,8 +1,3 @@
-export async function generateStaticParams() {
-  // Return an empty array since this is a dynamic route that doesn't need static generation
-  return [];
-}
-
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
