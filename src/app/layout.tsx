@@ -13,7 +13,7 @@
 
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "@/lib/supabase/context";
+import { Providers } from "@/components/Providers";
 import Navigation from "@/components/Navigation";
 
 /**
@@ -76,15 +76,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {/* AuthProvider wraps the app to provide Supabase authentication context to all components */}
-        <AuthProvider>
+        {/* Providers wraps the app to provide Supabase authentication context to all components */}
+        <Providers>
           {/* Desktop navigation header */}
           <Navigation />
           {/* Main content area with top padding for navigation, background, and minimum height */}
           <main className="pt-18 bg-gray-50 min-h-screen">{children}</main>
           {/* Mobile bottom navigation bar */}
           <NavigationSmall />
-        </AuthProvider>
+        </Providers>
       </body>
     </html>
   );
