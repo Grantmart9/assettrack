@@ -6,6 +6,7 @@ const nextConfig = {
         unoptimized: true,  // Add this for static export
     },
     output: 'export',  // Add this line for static export
+    trailingSlash: true,  // Generate /page/index.html instead of /page.html for nginx
 }
 
 module.exports = nextConfig

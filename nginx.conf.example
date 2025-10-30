@@ -1,0 +1,36 @@
+# Example nginx configuration for AssetTrack static export
+# Place this in your nginx sites-available directory
+
+server {
+    listen 80;
+    server_name your-domain.com;  # Replace with your domain
+    
+    root /path/to/assettrack/out;  # Replace with actual path to out folder
+    index index.html;
+
+    # Enable gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/json;
+
+    # Handle trailing slashes for clean URLs
+    location / {
+        try_files $uri $uri/ $uri.html =404;
+    }
+
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Don't serve hidden files
+    location ~ /\. {
+        deny all;
+    }
+}
