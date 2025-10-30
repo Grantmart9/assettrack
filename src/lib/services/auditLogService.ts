@@ -50,7 +50,7 @@ export const auditLogService = {
     try {
       const supabase = getSupabaseClient();
       let query = supabase
-        .from("auditlog")
+        .from("AuditLog")
         .select("*")
         .order("timestamp", { ascending: false });
 
@@ -93,7 +93,7 @@ export const auditLogService = {
     try {
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
-        .from("auditlog")
+        .from("AuditLog")
         .select("*")
         .eq("id", id)
         .single();
@@ -126,7 +126,7 @@ export const auditLogService = {
       // Original implementation (commented out due to type issues):
       // const supabase = getSupabaseClient();
       // const { data, error } = await supabase
-      //   .from("auditlog")
+      //   .from("AuditLog")
       //   .insert(auditLog)
       //   .select()
       //   .single();
